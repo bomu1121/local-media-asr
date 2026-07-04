@@ -7,7 +7,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { processMedia, getMediaInfo, checkFfmpeg, downloadFfmpeg } from "../utils/invoke";
 import { onExtractProgress, onTranscribeProgress } from "../utils/events";
-import type { TaskFile } from "../stores/app";
+import type { TaskFile, TranscriptionResult } from "../stores/app";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
 const store = useAppStore();
@@ -30,9 +30,9 @@ function statusLabel(status: TaskFile["status"]): string {
   const l: Record<string,string> = { pending:"等待中", processing:"处理中", completed:"已完成", failed:"失败" };
   return l[status]||status;
 }
-function statusColor(status: TaskFile["status"]): string {
+function statusColor(status: TaskFile["status"]): "default"|"info"|"success"|"error" {
   const c: Record<string,string> = { pending:"default", processing:"info", completed:"success", failed:"error" };
-  return c[status]||"default";
+  return (c[status]||"default") as "default"|"info"|"success"|"error";
 }
 
 async function handleFileSelect() {
@@ -61,7 +61,7 @@ async function handleProcess(task: TaskFile) {
   task.status = "processing"; task.progress = 0;
   try {
     const result = await processMedia(task.path, store.settings.engine);
-    task.result = result; task.status = "completed"; task.progress = 100;
+    task.result = result as any; task.status = "completed"; task.progress = 100;
     message.success("处理完成");
   } catch(e: any) { task.status = "failed"; task.error = String(e); message.error(`处理失败: ${e}`); }
 }

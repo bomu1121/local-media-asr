@@ -43,3 +43,5 @@ src-tauri/sherpa-onnx-lib/
 # Compressed archives & extracted audio
 *.7z
 *.wav
+
+src-tauri/*.dll

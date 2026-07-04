@@ -20,7 +20,6 @@
         "resizable": true,
         "fullscreen": false,
         "center": true,
-        "dragDropEnabled": true,
         "decorations": true
       }
     ],
@@ -30,7 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": "nsis",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,10 +39,19 @@
     ],
     "windows": {
       "nsis": {
-        "languages": ["SimpChinese", "English"],
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
         "installMode": "currentUser"
       }
-    }
+    },
+    "resources": [
+      "sherpa-onnx-c-api.dll",
+      "sherpa-onnx-cxx-api.dll",
+      "onnxruntime.dll",
+      "onnxruntime_providers_shared.dll"
+    ]
   },
   "plugins": {}
 }
