@@ -79,6 +79,26 @@ pub async fn export_result(
         .map_err(|e| e.to_string())
 }
 
+
+// ============================================================
+// History / Database (Phase 6)
+// ============================================================
+
+#[tauri::command]
+pub async fn list_history(limit: i64, offset: i64) -> Result<Vec<crate::db::TaskRecord>, String> {
+    tokio::task::spawn_blocking(move || crate::db::list_tasks(limit, offset))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_task(task_id: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || crate::db::delete_task(&task_id))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+        .map_err(|e| e.to_string())
+}
 // ============================================================
 // Model management (Phase 3-4)
 // ============================================================

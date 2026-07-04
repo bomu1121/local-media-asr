@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { ref, onMounted } from "vue";
 import {
   NCard,
   NButton,
@@ -10,6 +10,7 @@ import {
   NEmpty,
   NScrollbar,
   NSelect,
+  NSpin,
   useMessage,
 } from "naive-ui";
 import {
@@ -17,15 +18,16 @@ import {
   DownloadOutline,
   TimeOutline,
   DocumentTextOutline,
+  RefreshOutline,
 } from "@vicons/ionicons5";
 import { useAppStore } from "../stores/app";
-import type { ExportFormat } from "../stores/app";
+import { listHistory, deleteTask } from "../utils/invoke";
+import type { TaskRecord } from "../utils/types";
 
 const store = useAppStore();
 const message = useMessage();
-
-const tasks = computed(() => store.tasks);
-const completedTasks = computed(() => tasks.value.filter((t) => t.status === "completed"));
+const historyTasks = ref<TaskRecord[]>([]);
+const loading = ref(false);
 
 const exportFormatOptions = [
   { label: "纯文本 (TXT)", value: "txt" },
@@ -49,86 +51,111 @@ function copyText(text: string) {
   });
 }
 
-function exportResult(taskId: string, format: ExportFormat) {
-  message.info(`导出中: ${format.toUpperCase()}...`);
+async function loadHistory() {
+  loading.value = true;
+  try {
+    historyTasks.value = await listHistory(50, 0);
+  } catch (err: any) {
+    message.error(`加载历史失败: ${err}`);
+  } finally {
+    loading.value = false;
+  }
 }
+
+async function removeTask(taskId: string) {
+  try {
+    await deleteTask(taskId);
+    historyTasks.value = historyTasks.value.filter((t) => t.id !== taskId);
+    message.success("已删除");
+  } catch (err: any) {
+    message.error(`删除失败: ${err}`);
+  }
+}
+
+function exportResult(taskId: string, format: string) {
+  message.info(`导出中: ${format.toUpperCase()}...`);
+  // Will invoke export Tauri command when transcription result is available
+}
+
+onMounted(() => {
+  loadHistory();
+});
 </script>
 
 <template>
   <div class="history-panel">
     <div class="panel-header">
       <NText strong style="font-size: 16px;">历史记录</NText>
-      <NText depth="3" style="font-size: 13px;">
-        共 {{ completedTasks.length }} 条已完成任务
-      </NText>
+      <NSpace :size="8">
+        <NText depth="3" style="font-size: 13px;">
+          共 {{ historyTasks.length }} 条
+        </NText>
+        <NButton size="tiny" quaternary @click="loadHistory">
+          <template #icon><NIcon><RefreshOutline /></NIcon></template>
+        </NButton>
+      </NSpace>
     </div>
 
-    <NEmpty v-if="completedTasks.length === 0" description="暂无历史记录，先完成一次转写吧" />
+    <NSpin :show="loading">
+      <NEmpty v-if="!loading && historyTasks.length === 0" description="暂无历史记录" />
 
-    <NScrollbar v-else style="max-height: calc(100vh - 180px);">
-      <NSpace vertical :size="16">
-        <NCard
-          v-for="task in completedTasks"
-          :key="task.id"
-          size="small"
-          :bordered="true"
-          :title="task.name"
-        >
-          <template #header-extra>
-            <NSpace :size="8" align="center">
-              <NTag size="tiny" :bordered="false" type="success">已完成</NTag>
-              <NTag size="tiny" :bordered="false" type="info" v-if="task.result">
-                {{ task.result.engine === "fast" ? "快速引擎" : "精准引擎" }}
-              </NTag>
-              <NText depth="3" style="font-size: 12px;" v-if="task.result">
-                {{ formatDuration(task.result.duration) }}
-              </NText>
-            </NSpace>
-          </template>
-
-          <div class="result-content">
-            <NScrollbar style="max-height: 200px;">
-              <NText class="result-text">
-                {{ task.result?.text || "无内容" }}
-              </NText>
-            </NScrollbar>
-
-            <div class="result-actions">
-              <NSpace :size="4">
-                <NButton
-                  size="tiny"
-                  quaternary
-                  @click="copyText(task.result?.text || '')"
-                >
-                  <template #icon>
-                    <NIcon><CopyOutline /></NIcon>
-                  </template>
-                  复制
-                </NButton>
-                <NSelect
-                  size="tiny"
-                  :value="store.settings.exportFormat"
-                  :options="exportFormatOptions"
-                  style="width: 140px;"
-                  placeholder="导出格式"
-                />
-                <NButton
-                  size="tiny"
-                  quaternary
-                  type="primary"
-                  @click="exportResult(task.id, store.settings.exportFormat)"
-                >
-                  <template #icon>
-                    <NIcon><DownloadOutline /></NIcon>
-                  </template>
-                  导出
-                </NButton>
+      <NScrollbar v-else style="max-height: calc(100vh - 180px);">
+        <NSpace vertical :size="16">
+          <NCard
+            v-for="task in historyTasks"
+            :key="task.id"
+            size="small"
+            :bordered="true"
+            :title="task.name"
+          >
+            <template #header-extra>
+              <NSpace :size="8" align="center">
+                <NTag size="tiny" :bordered="false" :type="task.status === 'completed' ? 'success' : 'default'">
+                  {{ task.status === 'completed' ? '已完成' : task.status }}
+                </NTag>
+                <NTag size="tiny" :bordered="false" type="info" v-if="task.engine">
+                  {{ task.engine === "fast" ? "快速引擎" : "精准引擎" }}
+                </NTag>
+                <NText depth="3" style="font-size: 12px;" v-if="task.result">
+                  {{ formatDuration(task.result.duration_secs) }}
+                </NText>
               </NSpace>
+            </template>
+
+            <div class="result-content">
+              <NScrollbar style="max-height: 200px;">
+                <NText class="result-text">
+                  {{ task.result?.full_text || "无转写内容" }}
+                </NText>
+              </NScrollbar>
+
+              <div class="result-actions">
+                <NSpace :size="4">
+                  <NButton
+                    size="tiny"
+                    quaternary
+                    @click="copyText(task.result?.full_text || '')"
+                  >
+                    <template #icon>
+                      <NIcon><CopyOutline /></NIcon>
+                    </template>
+                    复制
+                  </NButton>
+                  <NButton
+                    size="tiny"
+                    quaternary
+                    type="error"
+                    @click="removeTask(task.id)"
+                  >
+                    删除
+                  </NButton>
+                </NSpace>
+              </div>
             </div>
-          </div>
-        </NCard>
-      </NSpace>
-    </NScrollbar>
+          </NCard>
+        </NSpace>
+      </NScrollbar>
+    </NSpin>
   </div>
 </template>
 
@@ -140,7 +167,7 @@ function exportResult(taskId: string, format: ExportFormat) {
 .panel-header {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  justify-content: space-between;
   margin-bottom: 16px;
 }
 

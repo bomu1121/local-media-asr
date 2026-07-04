@@ -5,6 +5,7 @@ import type {
   FileInfo,
   AppConfig,
   ModelStatus,
+  TaskRecord,
 } from "./types";
 
 /** Extract audio from media file, converting to 16kHz mono WAV */
@@ -30,4 +31,14 @@ export async function checkModels(): Promise<ModelStatus[]> {
 /** Get application configuration */
 export async function getAppConfig(): Promise<AppConfig> {
   return invoke("get_app_config");
+}
+
+/** List task history from SQLite database */
+export async function listHistory(limit: number, offset: number): Promise<TaskRecord[]> {
+  return invoke("list_history", { limit, offset });
+}
+
+/** Delete a task and its transcription from the database */
+export async function deleteTask(taskId: string): Promise<void> {
+  return invoke("delete_task", { taskId });
 }

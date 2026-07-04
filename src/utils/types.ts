@@ -60,3 +60,23 @@ export interface TaskProgress {
   progress: number;
   message: string;
 }
+
+export interface TaskRecord {
+  id: string;
+  name: string;
+  file_path: string;
+  file_size: number;
+  file_format: string;
+  status: string;
+  engine: string;
+  created_at: string;
+  updated_at: string;
+  result: {
+    task_id: string;
+    engine: string;
+    full_text: string;
+    duration_secs: number;
+    created_at: string;
+    segments: Array<{ start_time: number; end_time: number; text: string }>;
+  } | null;
+}

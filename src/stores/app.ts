@@ -49,6 +49,9 @@ export const useAppStore = defineStore("app", () => {
   const tasks = ref<TaskFile[]>([]);
   const activeTaskId = ref<string | null>(null);
   const activeTab = ref<"transcribe" | "history" | "settings">("transcribe");
+  const activeTask = computed(() =>
+    tasks.value.find((t) => t.id === activeTaskId.value) ?? null
+  );
 
   const settings = ref<AppSettings>({
     engine: "fast",
@@ -64,8 +67,6 @@ export const useAppStore = defineStore("app", () => {
     },
     outputDir: "",
   });
-
-  const activeTask = ref<TaskFile | null>(null);
 
   function addTask(file: Omit<TaskFile, "id" | "status" | "progress">) {
     const task: TaskFile = {
