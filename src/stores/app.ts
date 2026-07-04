@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 
 export type EngineType = "fast" | "precise";
 export type ExportFormat = "txt" | "srt" | "lrc" | "json" | "vtt";

@@ -113,8 +113,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::extract_audio,
             commands::get_media_info,
-            commands::check_ffmpeg,
-            commands::start_transcription,
+    commands::check_ffmpeg,
+    commands::download_ffmpeg,
+    commands::open_folder,
+    commands::start_transcription,
             commands::export_result,
             commands::list_history,
             commands::delete_task,

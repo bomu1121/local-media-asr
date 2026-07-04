@@ -45,22 +45,5 @@
       }
     }
   },
-  "plugins": {
-    "dialog": {},
-    "fs": {
-      "scope": {
-        "allow": ["**"],
-        "deny": []
-      }
-    },
-    "shell": {
-      "scope": [
-        {
-          "name": "ffmpeg-sidecar",
-          "cmd": "binaries/ffmpeg",
-          "args": true
-        }
-      ]
-    }
-  }
+  "plugins": {}
 }

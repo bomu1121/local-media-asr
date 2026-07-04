@@ -23,12 +23,27 @@ export async function checkFfmpeg(): Promise<string> {
   return invoke("check_ffmpeg");
 }
 
+/** Auto-download FFmpeg binary via ffmpeg-sidecar */
+export async function downloadFfmpeg(): Promise<string> {
+  return invoke("download_ffmpeg");
+}
+
+/** Start ASR transcription on extracted audio */
+export async function startTranscription(
+  audioPath: string,
+  engineType: string,
+): Promise<TranscriptionResult> {
+  return invoke("start_transcription", { audioPath, engineType });
+}
+
 /** List available ASR models and their installation status */
 export async function checkModels(): Promise<ModelStatus[]> {
   return invoke("check_models");
 }
 
 /** Get application configuration */
+
+/** Start ASR transcription on extracted audio */
 export async function getAppConfig(): Promise<AppConfig> {
   return invoke("get_app_config");
 }

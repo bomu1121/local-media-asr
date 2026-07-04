@@ -33,3 +33,13 @@ models/
 
 # Binaries
 binaries/
+
+# FFmpeg binaries
+ffmpeg/
+
+# Sherpa-onnx libraries
+src-tauri/sherpa-onnx-lib/
+
+# Compressed archives & extracted audio
+*.7z
+*.wav

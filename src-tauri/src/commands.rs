@@ -78,3 +78,26 @@ pub async fn check_models() -> Result<Vec<ModelStatus>, String> {
 pub async fn get_app_config() -> Result<crate::AppConfig, String> {
     Ok(crate::AppConfig { models_dir: "./models".into(), output_dir: "./output".into(), ffmpeg_path: "ffmpeg".into(), download_mirror: "https://www.modelscope.cn".into() })
 }
+// ============================================================
+// FFmpeg auto-download
+// ============================================================
+
+#[tauri::command]
+pub async fn download_ffmpeg() -> Result<String, String> {
+    tokio::task::spawn_blocking(|| {
+        ffmpeg_sidecar::download::auto_download()
+            .map(|_| "FFmpeg downloaded successfully".to_string())
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+// ============================================================
+// Utility
+// ============================================================
+
+#[tauri::command]
+pub async fn open_folder(path: String) -> Result<(), String> {
+    std::process::Command::new("explorer").arg(&path).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
