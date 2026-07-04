@@ -26,12 +26,11 @@ pub async fn start_transcription(audio_path: String, engine_type: String, window
     use crate::asr::{AsrEngine, EngineType};
     use crate::pipeline;
     use crate::vad::VadConfig;
-    use std::sync::Arc;
-    let engine = Arc::new(AsrEngine::new("./models", EngineType::from_str(&engine_type)));
+    let mut engine = AsrEngine::new("./models", EngineType::from_str(&engine_type));
     let _ = engine.load();
     let vad_config = VadConfig::default();
     let win = window.clone();
-    tokio::task::spawn_blocking(move || pipeline::transcribe_pipeline(&audio_path, &engine, &vad_config, true, &win))
+    tokio::task::spawn_blocking(move || pipeline::transcribe_pipeline(&audio_path, &mut engine, &vad_config, true, &win))
         .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
 }
 

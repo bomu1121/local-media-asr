@@ -45,9 +45,7 @@ fn read_wav_samples(path: &str) -> Result<(Vec<f32>, u32)> {
 }
 
 /// Run the full transcription pipeline on a WAV audio file
-pub fn transcribe_pipeline(
-    audio_path: &str,
-    engine: &AsrEngine,
+pub fn transcribe_pipeline(audio_path: &str, engine: &mut AsrEngine,
     vad_config: &VadConfig,
     use_vad: bool,
     window: &tauri::Window,
@@ -170,7 +168,7 @@ pub fn transcribe_pipeline(
         .join("\n");
 
     let duration = start_time.elapsed().as_secs_f64();
-    let engine_name = match engine.engine_type() {
+    let engine_name = match engine.engine_type {
         EngineType::Fast => "fast",
         EngineType::Precise => "precise",
     };
