@@ -30,7 +30,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 ureq = "2"
 
 # Sherpa-onnx ASR engine (optional - enable when models are available)
-sherpa-rs = { version = "0.6", features = ["download-binaries"], optional = true }
+sherpa-rs = { version = "0.6", default-features = false, features = ["tts"], optional = true }
 
 [features]
 default = []
