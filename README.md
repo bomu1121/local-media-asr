@@ -128,6 +128,37 @@ sherpa-onnx C API DLL (v1.12.9)
     └── ONNX Runtime (推理引擎)
 ```
 
+
+## 发布
+
+### 构建安装包
+
+```bash
+# 1. 安装 NSIS（Tauri 打包需要）
+# 下载 https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip
+# 解压到 %LOCALAPPDATA%\tauri\NSIS\Bundle\
+
+# 2. 设置环境
+set SHERPA_LIB_PATH=src-tauri\sherpa-onnx-lib\sherpa-onnx-v1.12.9-win-x64-shared
+set LIBCLANG_PATH=C:\Program Files\LLVM\bin
+set CI=true
+
+# 3. 构建
+pnpm tauri build
+```
+
+构建产物在 `src-tauri/target/release/bundle/nsis/`，包含：
+- `local-media-asr_0.1.0_x64-setup.exe` — 安装包（含 exe + sherpa-onnx DLL + onnxruntime DLL）
+
+### 发布到 GitHub
+
+1. 前往 [Releases](https://github.com/bomu1121/local-media-asr/releases/new)
+2. Tag: `v0.1.0`，上传 `local-media-asr_0.1.0_x64-setup.exe`
+3. 发布
+
+### 用户安装后
+
+安装包约 7 MB。首次启动会自动下载 FFmpeg (~80 MB)。AI 模型需手动放置到 `%APPDATA%\local-media-asr\models\`（后续版本将内置下载通道）。
 ## License
 
 MIT
