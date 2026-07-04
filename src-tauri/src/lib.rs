@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+﻿use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod commands;
@@ -113,11 +113,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::extract_audio,
             commands::get_media_info,
-    commands::check_ffmpeg,
-    commands::download_ffmpeg,
-    commands::open_folder,
-    commands::start_transcription,
-            commands::export_result,
+            commands::check_ffmpeg,
+            commands::download_ffmpeg,
+            commands::open_folder,
+            commands::process_media,
+            commands::export_result_string,
+            commands::save_export_file,
             commands::list_history,
             commands::delete_task,
             commands::download_model,

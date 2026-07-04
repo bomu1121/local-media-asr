@@ -1,25 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, onMounted } from "vue";
 import {
-  NCard,
-  NButton,
-  NSpace,
-  NText,
-  NIcon,
-  NTag,
-  NEmpty,
-  NScrollbar,
-  NSelect,
-  NSpin,
-  useMessage,
+  NCard, NButton, NSpace, NText, NIcon, NTag, NEmpty, NScrollbar, NSelect, NSpin, useMessage,
 } from "naive-ui";
-import {
-  CopyOutline,
-  DownloadOutline,
-  TimeOutline,
-  DocumentTextOutline,
-  RefreshOutline,
-} from "@vicons/ionicons5";
+import { CopyOutline, DownloadOutline, TimeOutline, DocumentTextOutline, RefreshOutline } from "@vicons/ionicons5";
 import { useAppStore } from "../stores/app";
 import { listHistory, deleteTask } from "../utils/invoke";
 import type { TaskRecord } from "../utils/types";
@@ -51,6 +35,15 @@ function copyText(text: string) {
   });
 }
 
+function selectHistoryItem(task: TaskRecord) {
+  store.activeHistoryId = task.id;
+  store.activeHistoryResult = task.result ? {
+    text: task.result.full_text,
+    segments: [],
+    engine: task.engine as any,
+    duration: task.result.duration_secs,
+  } : null;
+}
 async function loadHistory() {
   loading.value = true;
   try {
@@ -74,7 +67,6 @@ async function removeTask(taskId: string) {
 
 function exportResult(taskId: string, format: string) {
   message.info(`导出中: ${format.toUpperCase()}...`);
-  // Will invoke export Tauri command when transcription result is available
 }
 
 onMounted(() => {
@@ -87,9 +79,7 @@ onMounted(() => {
     <div class="panel-header">
       <NText strong style="font-size: 16px;">历史记录</NText>
       <NSpace :size="8">
-        <NText depth="3" style="font-size: 13px;">
-          共 {{ historyTasks.length }} 条
-        </NText>
+        <NText depth="3" style="font-size: 13px;">共 {{ historyTasks.length }} 条</NText>
         <NButton size="tiny" quaternary @click="loadHistory">
           <template #icon><NIcon><RefreshOutline /></NIcon></template>
         </NButton>
@@ -101,13 +91,7 @@ onMounted(() => {
 
       <NScrollbar v-else style="max-height: calc(100vh - 180px);">
         <NSpace vertical :size="16">
-          <NCard
-            v-for="task in historyTasks"
-            :key="task.id"
-            size="small"
-            :bordered="true"
-            :title="task.name"
-          >
+          <NCard v-for="task in historyTasks" @click="selectHistoryItem(task)" :class="{ selected: store.activeHistoryId === task.id }" style="cursor:pointer" :key="task.id" size="small" :bordered="true" :title="task.name">
             <template #header-extra>
               <NSpace :size="8" align="center">
                 <NTag size="tiny" :bordered="false" :type="task.status === 'completed' ? 'success' : 'default'">
@@ -122,36 +106,17 @@ onMounted(() => {
               </NSpace>
             </template>
 
-            <div class="result-content">
-              <NScrollbar style="max-height: 200px;">
-                <NText class="result-text">
-                  {{ task.result?.full_text || "无转写内容" }}
-                </NText>
-              </NScrollbar>
-
-              <div class="result-actions">
-                <NSpace :size="4">
-                  <NButton
-                    size="tiny"
-                    quaternary
-                    @click="copyText(task.result?.full_text || '')"
-                  >
-                    <template #icon>
-                      <NIcon><CopyOutline /></NIcon>
-                    </template>
-                    复制
-                  </NButton>
-                  <NButton
-                    size="tiny"
-                    quaternary
-                    type="error"
-                    @click="removeTask(task.id)"
-                  >
-                    删除
-                  </NButton>
-                </NSpace>
-              </div>
-            </div>
+                        <template #footer>
+              <NSpace :size="4" justify="end">
+                <NButton size="tiny" quaternary @click.stop="copyText(task.result?.full_text || '')">
+                  <template #icon><NIcon><CopyOutline /></NIcon></template>
+                  复制
+                </NButton>
+                <NButton size="tiny" quaternary type="error" @click.stop="removeTask(task.id)">
+                  删除
+                </NButton>
+              </NSpace>
+            </template>
           </NCard>
         </NSpace>
       </NScrollbar>
@@ -160,33 +125,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.history-panel {
-  max-width: 800px;
-}
-
-.panel-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.result-content {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.result-text {
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.8;
-  font-size: 14px;
-  color: var(--n-text-color-2);
-}
-
-.result-actions {
-  border-top: 1px solid var(--n-border-color);
-  padding-top: 8px;
-}
+.history-panel { }
+.selected { border-color:#2080f0;background:rgba(32,128,240,0.03); }
+.panel-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+.result-content { display: flex; flex-direction: column; gap: 12px; }
+.result-text { white-space: pre-wrap; word-break: break-all; line-height: 1.8; font-size: 14px; color: var(--n-text-color-2); }
+.result-actions { border-top: 1px solid var(--n-border-color); padding-top: 8px; }
 </style>

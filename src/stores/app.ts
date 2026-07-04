@@ -1,4 +1,4 @@
-import { defineStore } from "pinia";
+﻿import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 
 export type EngineType = "fast" | "precise";
@@ -10,7 +10,7 @@ export interface TaskFile {
   path: string;
   size: number;
   format: string;
-  status: "pending" | "extracting" | "transcribing" | "completed" | "failed";
+  status: "pending" | "processing" | "completed" | "failed";
   progress: number;
   error?: string;
   result?: TranscriptionResult;
@@ -49,6 +49,8 @@ export const useAppStore = defineStore("app", () => {
   const tasks = ref<TaskFile[]>([]);
   const activeTaskId = ref<string | null>(null);
   const activeTab = ref<"transcribe" | "history" | "settings">("transcribe");
+  const activeHistoryResult = ref<TranscriptionResult | null>(null);
+  const activeHistoryId = ref<string | null>(null);
   const activeTask = computed(() =>
     tasks.value.find((t) => t.id === activeTaskId.value) ?? null
   );
@@ -102,6 +104,8 @@ export const useAppStore = defineStore("app", () => {
     activeTab,
     settings,
     activeTask,
+    activeHistoryResult,
+    activeHistoryId,
     addTask,
     removeTask,
     selectTask,
