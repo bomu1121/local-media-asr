@@ -1,0 +1,35 @@
+# Build output
+dist/
+target/
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Rust
+**/*.rs.bk
+
+# Models (large files)
+models/
+*.onnx
+
+# Binaries
+binaries/

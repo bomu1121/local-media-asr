@@ -1,0 +1,18 @@
+[build]
+rustflags = []
+
+[env]
+CARGO_HTTP_MULTIPLEXING = "true"
+CARGO_HTTP_TIMEOUT = "600"
+CARGO_NET_RETRY = "5"
+
+[net]
+retry = 5
+git-fetch-with-cli = true
+
+# Uncomment for China mirror (ustc)
+# [source.crates-io]
+# replace-with = 'ustc'
+#
+# [source.ustc]
+# registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
