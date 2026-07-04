@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicfv/tauri-plugin-settings/v2/schemas/tauri-conf.schema.json",
   "productName": "local-media-asr",
   "version": "0.1.0",
   "identifier": "com.localmedia.asr",
@@ -39,13 +38,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "binaries/ffmpeg"
-    ],
-    "resources": {
-      "models/mandatory/*": "./",
-      "models/optional/*": "./"
-    },
     "windows": {
       "nsis": {
         "languages": ["SimpChinese", "English"],

@@ -1,6 +1,9 @@
 [build]
 rustflags = []
 
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"
+
 [env]
 CARGO_HTTP_MULTIPLEXING = "true"
 CARGO_HTTP_TIMEOUT = "600"

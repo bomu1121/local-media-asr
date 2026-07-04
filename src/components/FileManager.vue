@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import {
-  NUpload,
   NUploadDragger,
-  NCard,
   NButton,
   NSpace,
   NText,
@@ -14,10 +12,7 @@ import {
   NListItem,
   NScrollbar,
   NPopconfirm,
-  NEmpty,
   useMessage,
-  type UploadOnFinish,
-  type UploadOnError,
 } from "naive-ui";
 import {
   CloudUploadOutline,
@@ -28,10 +23,13 @@ import {
   CheckmarkCircleOutline,
   CloseCircleOutline,
   TimeOutline,
-  DocumentTextOutline,
+  WarningOutline,
 } from "@vicons/ionicons5";
 import { useAppStore } from "../stores/app";
+import { extractAudio, getMediaInfo, checkFfmpeg } from "../utils/invoke";
+import { onExtractProgress } from "../utils/events";
 import type { TaskFile } from "../stores/app";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 
 const store = useAppStore();
 const message = useMessage();
@@ -40,6 +38,32 @@ const acceptFormats =
   ".mp3,.wav,.flac,.aac,.ogg,.wma,.m4a,.opus,.mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v";
 
 const tasks = computed(() => store.tasks);
+const ffmpegReady = ref<boolean | null>(null);
+const ffmpegVersion = ref("");
+let unlistenProgress: UnlistenFn | null = null;
+
+onMounted(async () => {
+  // Check FFmpeg on mount
+  try {
+    const ver = await checkFfmpeg();
+    ffmpegVersion.value = ver;
+    ffmpegReady.value = true;
+  } catch {
+    ffmpegReady.value = false;
+  }
+
+  // Listen to extraction progress events
+  unlistenProgress = await onExtractProgress((progress) => {
+    const task = tasks.value.find((t) => t.id === store.activeTaskId);
+    if (task && task.status === "extracting") {
+      task.progress = Math.round(progress.progress * 100);
+    }
+  });
+});
+
+onUnmounted(() => {
+  unlistenProgress?.();
+});
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -54,63 +78,26 @@ function isAudio(format: string): boolean {
   );
 }
 
-function statusIcon(status: TaskFile["status"]) {
-  switch (status) {
-    case "pending":
-      return TimeOutline;
-    case "completed":
-      return CheckmarkCircleOutline;
-    case "failed":
-      return CloseCircleOutline;
-    case "extracting":
-    case "transcribing":
-      return CloudUploadOutline;
-  }
-}
-
 function statusColor(status: TaskFile["status"]): string {
-  switch (status) {
-    case "pending":
-      return "default";
-    case "completed":
-      return "success";
-    case "failed":
-      return "error";
-    case "extracting":
-    case "transcribing":
-      return "info";
-  }
+  const colors: Record<string, string> = {
+    pending: "default",
+    extracting: "info",
+    transcribing: "info",
+    completed: "success",
+    failed: "error",
+  };
+  return colors[status] || "default";
 }
 
 function statusLabel(status: TaskFile["status"]): string {
-  switch (status) {
-    case "pending":
-      return "等待中";
-    case "completed":
-      return "已完成";
-    case "failed":
-      return "失败";
-    case "extracting":
-      return "提取音频";
-    case "transcribing":
-      return "转写中";
-  }
-}
-
-// Handle native drag-and-drop from Tauri
-async function onDropFiles(e: DragEvent) {
-  const files = e.dataTransfer?.files;
-  if (!files) return;
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const ext = file.name.split(".").pop() || "";
-    store.addTask({
-      name: file.name,
-      path: (file as any).path || file.name,
-      size: file.size,
-      format: ext,
-    });
-  }
+  const labels: Record<string, string> = {
+    pending: "等待中",
+    extracting: "提取音频",
+    transcribing: "转写中",
+    completed: "已完成",
+    failed: "失败",
+  };
+  return labels[status] || status;
 }
 
 function handleFileSelect(option: { file: any; fileList: any[] }) {
@@ -122,17 +109,53 @@ function handleFileSelect(option: { file: any; fileList: any[] }) {
     size: file.size || 0,
     format: ext,
   });
+  message.success(`已添加: ${file.name}`);
 }
 
-function startTranscription(task: TaskFile) {
+async function startExtraction(task: TaskFile) {
+  if (!ffmpegReady.value) {
+    message.error("FFmpeg 未就绪，请先在设置中检查");
+    return;
+  }
+
   store.selectTask(task.id);
-  message.info(`开始转写: ${task.name}`);
-  // Will invoke Tauri command in Phase 3
+  
+  // Determine output path in app data directory
+  const baseName = task.name.replace(/\.[^.]+$/, "");
+  const outputPath = `${baseName}_extracted.wav`;
+
+  task.status = "extracting";
+  task.progress = 0;
+
+  try {
+    const result = await extractAudio({
+      input_path: task.path,
+      output_path: outputPath,
+      denoise: store.settings.denoise,
+    });
+
+    // After extraction, probe media info
+    const info = await getMediaInfo(task.path);
+    
+    task.status = "pending"; // ready for transcription
+    task.progress = 100;
+    message.success(`音频提取完成: ${task.name}`);
+  } catch (err: any) {
+    task.status = "failed";
+    task.error = String(err);
+    message.error(`提取失败: ${err}`);
+  }
 }
 </script>
 
 <template>
-  <div class="file-manager" @drop.prevent="onDropFiles" @dragover.prevent>
+  <div class="file-manager">
+    <!-- FFmpeg Status Banner -->
+    <div v-if="ffmpegReady === false" class="ffmpeg-banner error">
+      <NIcon size="18"><WarningOutline /></NIcon>
+      <NText>FFmpeg 未就绪，请确保 FFmpeg 已安装或通过 Sidecar 提供</NText>
+    </div>
+
     <!-- Drop Zone -->
     <NUploadDragger
       :accept="acceptFormats"
@@ -159,7 +182,7 @@ function startTranscription(task: TaskFile) {
       <NText strong style="font-size: 14px; margin-bottom: 12px; display: block;">
         任务列表 ({{ tasks.length }})
       </NText>
-      <NScrollbar style="max-height: 400px;">
+      <NScrollbar style="max-height: 460px;">
         <NList hoverable clickable>
           <NListItem
             v-for="task in tasks"
@@ -179,6 +202,21 @@ function startTranscription(task: TaskFile) {
                   <NText depth="3" style="font-size: 12px;">{{ task.format.toUpperCase() }}</NText>
                   <NText depth="3" style="font-size: 12px;">{{ formatSize(task.size) }}</NText>
                 </NSpace>
+                <NProgress
+                  v-if="task.status === 'extracting' || task.status === 'transcribing'"
+                  :percentage="task.progress"
+                  :height="4"
+                  :border-radius="2"
+                  style="margin-top: 6px; max-width: 200px;"
+                />
+                <NText
+                  v-if="task.error"
+                  type="error"
+                  depth="3"
+                  style="font-size: 12px;"
+                >
+                  {{ task.error }}
+                </NText>
               </div>
               <NSpace :size="8" align="center">
                 <NTag
@@ -186,35 +224,18 @@ function startTranscription(task: TaskFile) {
                   size="small"
                   :bordered="false"
                 >
-                  <template #icon>
-                    <NIcon size="14">
-                      <component :is="statusIcon(task.status)" />
-                    </NIcon>
-                  </template>
                   {{ statusLabel(task.status) }}
                 </NTag>
-                <NButton
-                  v-if="task.status === 'completed'"
-                  size="tiny"
-                  quaternary
-                  type="primary"
-                  @click.stop="startTranscription(task)"
-                >
-                  <template #icon>
-                    <NIcon><DocumentTextOutline /></NIcon>
-                  </template>
-                  查看
-                </NButton>
                 <NButton
                   v-if="task.status === 'pending'"
                   size="tiny"
                   type="primary"
-                  @click.stop="startTranscription(task)"
+                  @click.stop="startExtraction(task)"
                 >
                   <template #icon>
                     <NIcon><PlayOutline /></NIcon>
                   </template>
-                  开始
+                  提取
                 </NButton>
                 <NPopconfirm @positive-click="store.removeTask(task.id)">
                   <template #trigger>
@@ -239,8 +260,22 @@ function startTranscription(task: TaskFile) {
 .file-manager {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   max-width: 800px;
+}
+
+.ffmpeg-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.ffmpeg-banner.error {
+  background: rgba(208, 48, 80, 0.08);
+  color: #d03050;
 }
 
 .drop-zone-content {
@@ -266,6 +301,7 @@ function startTranscription(task: TaskFile) {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
 }
 
 .task-name {

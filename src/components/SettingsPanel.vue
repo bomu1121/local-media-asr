@@ -24,11 +24,13 @@ import {
   CloudDownloadOutline,
 } from "@vicons/ionicons5";
 import { useAppStore } from "../stores/app";
+import { checkFfmpeg } from "../utils/invoke";
 import type { EngineType, ExportFormat } from "../stores/app";
 
 const store = useAppStore();
 const message = useMessage();
 const ffmpegStatus = ref<string | null>(null);
+const checkingFfmpeg = ref(false);
 
 const engineOptions = [
   {
@@ -51,13 +53,17 @@ const exportOptions = [
   { label: "结构化 JSON", value: "json" },
 ];
 
-function checkFFmpeg() {
-  message.loading("检查FFmpeg状态...");
-  // Will invoke Tauri command in Phase 2
-  setTimeout(() => {
-    ffmpegStatus.value = "FFmpeg 6.1+ detected (via Sidecar)";
+async function checkFFmpeg() {
+  checkingFfmpeg.value = true;
+  try {
+    ffmpegStatus.value = await checkFfmpeg();
     message.success("FFmpeg 已就绪");
-  }, 500);
+  } catch (err: any) {
+    ffmpegStatus.value = null;
+    message.error(String(err));
+  } finally {
+    checkingFfmpeg.value = false;
+  }
 }
 
 function downloadModel(modelName: string) {

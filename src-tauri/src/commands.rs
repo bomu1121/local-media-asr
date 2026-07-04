@@ -1,8 +1,11 @@
-use crate::{
-    AudioExtractArgs, ExportArgs, FileInfo, TaskProgress, TranscriptionArgs, TranscriptionResult,
-};
+// Commands module - thin wrappers that delegate to service modules.
+// Each command is a #[tauri::command] that validates input,
+// calls the sync service function inside spawn_blocking,
+// and returns Result<T, String> for the frontend.
+
+use crate::ffmpeg;
+use crate::{AudioExtractArgs, FileInfo};
 use serde::{Deserialize, Serialize};
-use std::process::Command;
 
 // ============================================================
 // FFmpeg / Audio extraction commands (Phase 2)
@@ -13,122 +16,28 @@ pub async fn extract_audio(
     args: AudioExtractArgs,
     window: tauri::Window,
 ) -> Result<String, String> {
-    let task_id = uuid::Uuid::new_v4().to_string();
-
-    let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-i").arg(&args.input_path);
-
-    if args.denoise {
-        cmd.arg("-af").arg("afftdn=nr=15:nf=-25:tn=1");
-    }
-
-    cmd.args([
-        "-ac",
-        "1",
-        "-ar",
-        "16000",
-        "-acodec",
-        "pcm_s16le",
-        "-y",
-        &args.output_path,
-    ]);
-
-    let output = cmd
-        .output()
-        .map_err(|e| format!("FFmpeg execution failed: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Audio extraction failed: {}", stderr));
-    }
-
-    // Emit progress event
-    let _ = window.emit(
-        "extract-progress",
-        TaskProgress {
-            task_id: task_id.clone(),
-            stage: "extraction".into(),
-            progress: 1.0,
-            message: "Audio extracted successfully".into(),
-        },
-    );
-
-    Ok(args.output_path)
+    let win = window.clone();
+    // Run CPU-bound FFmpeg work on a blocking thread
+    tokio::task::spawn_blocking(move || ffmpeg::extract_audio_sync(&args, &win))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn get_media_info(file_path: String) -> Result<FileInfo, String> {
-    let path = std::path::Path::new(&file_path);
-    let name = path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    let metadata =
-        std::fs::metadata(&file_path).map_err(|e| format!("File not accessible: {}", e))?;
-
-    let mut info = FileInfo {
-        path: file_path.clone(),
-        name,
-        size: metadata.len(),
-        format: ext,
-        duration: None,
-        audio_channels: None,
-        sample_rate: None,
-    };
-
-    // Probe with FFprobe for duration and stream info
-    if let Ok(output) = Command::new("ffprobe")
-        .args([
-            "-v",
-            "quiet",
-            "-print_format",
-            "json",
-            "-show_format",
-            "-show_streams",
-            &file_path,
-        ])
-        .output()
-    {
-        if output.status.success() {
-            if let Ok(probe) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
-                if let Some(dur) = probe["format"]["duration"].as_str() {
-                    info.duration = dur.parse::<f64>().ok();
-                }
-                if let Some(streams) = probe["streams"].as_array() {
-                    for stream in streams {
-                        if stream["codec_type"] == "audio" {
-                            info.audio_channels = stream["channels"].as_i64().map(|c| c as i32);
-                            info.sample_rate = stream["sample_rate"].as_str().and_then(|s| s.parse::<i32>().ok());
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(info)
+    tokio::task::spawn_blocking(move || ffmpeg::get_media_info_sync(&file_path))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn check_ffmpeg() -> Result<String, String> {
-    match Command::new("ffmpeg").arg("-version").output() {
-        Ok(output) if output.status.success() => {
-            let version = String::from_utf8_lossy(&output.stdout);
-            Ok(version.lines().next().unwrap_or("FFmpeg found").to_string())
-        }
-        Ok(output) => Err(format!(
-            "FFmpeg not properly installed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )),
-        Err(e) => Err(format!("FFmpeg not found: {}", e)),
-    }
+    tokio::task::spawn_blocking(ffmpeg::check_ffmpeg_sync)
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+        .map_err(|e| e.to_string())
 }
 
 // ============================================================
@@ -145,7 +54,6 @@ pub struct ModelStatus {
 
 #[tauri::command]
 pub async fn check_models() -> Result<Vec<ModelStatus>, String> {
-    // Placeholder - will check model files in resources dir
     Ok(vec![
         ModelStatus {
             name: "SenseVoice-Small (int8)".into(),

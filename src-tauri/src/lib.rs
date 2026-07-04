@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod commands;
+mod ffmpeg;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioExtractArgs {
