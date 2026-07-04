@@ -7,6 +7,8 @@ mod asr;
 mod vad;
 mod pipeline;
 mod models;
+mod export;
+mod punct;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioExtractArgs {
@@ -101,6 +103,7 @@ pub fn run() {
     commands::get_media_info,
     commands::check_ffmpeg,
     commands::start_transcription,
+    commands::export_result,
     commands::check_models,
             commands::get_app_config,
         ])

@@ -1,14 +1,9 @@
-// Commands module - thin wrappers that delegate to service modules.
-// Each command is a #[tauri::command] that validates input,
-// calls the sync service function inside spawn_blocking,
-// and returns Result<T, String> for the frontend.
-
 use crate::ffmpeg;
 use crate::{AudioExtractArgs, FileInfo};
 use serde::{Deserialize, Serialize};
 
 // ============================================================
-// FFmpeg / Audio extraction commands (Phase 2)
+// FFmpeg / Audio extraction (Phase 2)
 // ============================================================
 
 #[tauri::command]
@@ -17,7 +12,6 @@ pub async fn extract_audio(
     window: tauri::Window,
 ) -> Result<String, String> {
     let win = window.clone();
-    // Run CPU-bound FFmpeg work on a blocking thread
     tokio::task::spawn_blocking(move || ffmpeg::extract_audio_sync(&args, &win))
         .await
         .map_err(|e| format!("Task join error: {}", e))?
@@ -41,59 +35,7 @@ pub async fn check_ffmpeg() -> Result<String, String> {
 }
 
 // ============================================================
-// Model management (Phase 3-4)
-// ============================================================
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ModelStatus {
-    pub name: String,
-    pub installed: bool,
-    pub size_bytes: Option<u64>,
-    pub required: bool,
-}
-
-#[tauri::command]
-pub async fn check_models() -> Result<Vec<ModelStatus>, String> {
-    Ok(vec![
-        ModelStatus {
-            name: "SenseVoice-Small (int8)".into(),
-            installed: false,
-            size_bytes: Some(230_000_000),
-            required: true,
-        },
-        ModelStatus {
-            name: "Paraformer-Large (int8)".into(),
-            installed: false,
-            size_bytes: Some(227_000_000),
-            required: false,
-        },
-        ModelStatus {
-            name: "Silero-VAD".into(),
-            installed: false,
-            size_bytes: Some(1_000_000),
-            required: true,
-        },
-        ModelStatus {
-            name: "CT-Transformer Punct".into(),
-            installed: false,
-            size_bytes: Some(100_000_000),
-            required: false,
-        },
-    ])
-}
-
-#[tauri::command]
-pub async fn get_app_config() -> Result<crate::AppConfig, String> {
-    Ok(crate::AppConfig {
-        models_dir: "./models".into(),
-        output_dir: "./output".into(),
-        ffmpeg_path: "ffmpeg".into(),
-        download_mirror: "https://www.modelscope.cn".into(),
-    })
-}
-
-// ============================================================
-// Transcription (Phase 3)
+// ASR Transcription (Phase 3-4)
 // ============================================================
 
 #[tauri::command]
@@ -109,23 +51,62 @@ pub async fn start_transcription(
 
     let engine_ty = EngineType::from_str(&engine_type);
     let engine = Arc::new(AsrEngine::new("./models", engine_ty));
-
-    // Try to load - continue even if model isn't available
     let _ = engine.load();
 
     let vad_config = VadConfig::default();
     let win = window.clone();
 
     tokio::task::spawn_blocking(move || {
-        pipeline::transcribe_pipeline(
-            &audio_path,
-            &engine,
-            &vad_config,
-            true, // use_vad
-            &win,
-        )
+        pipeline::transcribe_pipeline(&audio_path, &engine, &vad_config, true, &win)
     })
     .await
     .map_err(|e| format!("Task join error: {}", e))?
     .map_err(|e| e.to_string())
+}
+
+// ============================================================
+// Export (Phase 5)
+// ============================================================
+
+#[tauri::command]
+pub async fn export_result(
+    args: crate::ExportArgs,
+    result: crate::TranscriptionResult,
+) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || crate::export::export_to_file(&result, &args))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+        .map_err(|e| e.to_string())
+}
+
+// ============================================================
+// Model management (Phase 3-4)
+// ============================================================
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ModelStatus {
+    pub name: String,
+    pub installed: bool,
+    pub size_bytes: Option<u64>,
+    pub required: bool,
+}
+
+#[tauri::command]
+pub async fn check_models() -> Result<Vec<ModelStatus>, String> {
+    Ok(vec![
+        ModelStatus { name: "SenseVoice-Small (int8)".into(), installed: false, size_bytes: Some(230_000_000), required: true },
+        ModelStatus { name: "Paraformer-Large (int8)".into(), installed: false, size_bytes: Some(227_000_000), required: false },
+        ModelStatus { name: "Silero-VAD".into(), installed: false, size_bytes: Some(1_000_000), required: true },
+        ModelStatus { name: "CT-Transformer Punct".into(), installed: false, size_bytes: Some(100_000_000), required: false },
+    ])
+}
+
+#[tauri::command]
+pub async fn get_app_config() -> Result<crate::AppConfig, String> {
+    Ok(crate::AppConfig {
+        models_dir: "./models".into(),
+        output_dir: "./output".into(),
+        ffmpeg_path: "ffmpeg".into(),
+        download_mirror: "https://www.modelscope.cn".into(),
+    })
 }
