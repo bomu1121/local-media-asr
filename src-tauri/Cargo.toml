@@ -24,6 +24,14 @@ ffmpeg-sidecar = "2"
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
+wav = "1"
+
+# Sherpa-onnx ASR engine (optional - enable when models are available)
+sherpa-rs = { version = "0.6", features = ["download-binaries"], optional = true }
+
+[features]
+default = []
+asr = ["sherpa-rs"]
 
 [profile.release]
 panic = "abort"

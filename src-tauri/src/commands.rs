@@ -91,3 +91,41 @@ pub async fn get_app_config() -> Result<crate::AppConfig, String> {
         download_mirror: "https://www.modelscope.cn".into(),
     })
 }
+
+// ============================================================
+// Transcription (Phase 3)
+// ============================================================
+
+#[tauri::command]
+pub async fn start_transcription(
+    audio_path: String,
+    engine_type: String,
+    window: tauri::Window,
+) -> Result<crate::TranscriptionResult, String> {
+    use crate::asr::{AsrEngine, EngineType};
+    use crate::pipeline;
+    use crate::vad::VadConfig;
+    use std::sync::Arc;
+
+    let engine_ty = EngineType::from_str(&engine_type);
+    let engine = Arc::new(AsrEngine::new("./models", engine_ty));
+
+    // Try to load - continue even if model isn't available
+    let _ = engine.load();
+
+    let vad_config = VadConfig::default();
+    let win = window.clone();
+
+    tokio::task::spawn_blocking(move || {
+        pipeline::transcribe_pipeline(
+            &audio_path,
+            &engine,
+            &vad_config,
+            true, // use_vad
+            &win,
+        )
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+    .map_err(|e| e.to_string())
+}

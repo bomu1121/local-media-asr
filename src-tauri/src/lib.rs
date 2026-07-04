@@ -3,6 +3,10 @@ use std::path::PathBuf;
 
 mod commands;
 mod ffmpeg;
+mod asr;
+mod vad;
+mod pipeline;
+mod models;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioExtractArgs {
@@ -93,10 +97,11 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
-            commands::extract_audio,
-            commands::get_media_info,
-            commands::check_ffmpeg,
-            commands::check_models,
+    commands::extract_audio,
+    commands::get_media_info,
+    commands::check_ffmpeg,
+    commands::start_transcription,
+    commands::check_models,
             commands::get_app_config,
         ])
         .run(tauri::generate_context!())
