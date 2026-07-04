@@ -2,114 +2,68 @@ use crate::ffmpeg;
 use crate::{AudioExtractArgs, FileInfo};
 use serde::{Deserialize, Serialize};
 
-// ============================================================
-// FFmpeg / Audio extraction (Phase 2)
-// ============================================================
-
 #[tauri::command]
-pub async fn extract_audio(
-    args: AudioExtractArgs,
-    window: tauri::Window,
-) -> Result<String, String> {
+pub async fn extract_audio(args: AudioExtractArgs, window: tauri::Window) -> Result<String, String> {
     let win = window.clone();
     tokio::task::spawn_blocking(move || ffmpeg::extract_audio_sync(&args, &win))
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
-        .map_err(|e| e.to_string())
+        .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn get_media_info(file_path: String) -> Result<FileInfo, String> {
     tokio::task::spawn_blocking(move || ffmpeg::get_media_info_sync(&file_path))
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
-        .map_err(|e| e.to_string())
+        .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn check_ffmpeg() -> Result<String, String> {
     tokio::task::spawn_blocking(ffmpeg::check_ffmpeg_sync)
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
-        .map_err(|e| e.to_string())
+        .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
 }
 
-// ============================================================
-// ASR Transcription (Phase 3-4)
-// ============================================================
-
 #[tauri::command]
-pub async fn start_transcription(
-    audio_path: String,
-    engine_type: String,
-    window: tauri::Window,
-) -> Result<crate::TranscriptionResult, String> {
+pub async fn start_transcription(audio_path: String, engine_type: String, window: tauri::Window) -> Result<crate::TranscriptionResult, String> {
     use crate::asr::{AsrEngine, EngineType};
     use crate::pipeline;
     use crate::vad::VadConfig;
     use std::sync::Arc;
-
-    let engine_ty = EngineType::from_str(&engine_type);
-    let engine = Arc::new(AsrEngine::new("./models", engine_ty));
+    let engine = Arc::new(AsrEngine::new("./models", EngineType::from_str(&engine_type)));
     let _ = engine.load();
-
     let vad_config = VadConfig::default();
     let win = window.clone();
-
-    tokio::task::spawn_blocking(move || {
-        pipeline::transcribe_pipeline(&audio_path, &engine, &vad_config, true, &win)
-    })
-    .await
-    .map_err(|e| format!("Task join error: {}", e))?
-    .map_err(|e| e.to_string())
+    tokio::task::spawn_blocking(move || pipeline::transcribe_pipeline(&audio_path, &engine, &vad_config, true, &win))
+        .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
 }
-
-// ============================================================
-// Export (Phase 5)
-// ============================================================
 
 #[tauri::command]
-pub async fn export_result(
-    args: crate::ExportArgs,
-    result: crate::TranscriptionResult,
-) -> Result<String, String> {
+pub async fn export_result(args: crate::ExportArgs, result: crate::TranscriptionResult) -> Result<String, String> {
     tokio::task::spawn_blocking(move || crate::export::export_to_file(&result, &args))
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
-        .map_err(|e| e.to_string())
+        .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
 }
 
-
-// ============================================================
-// History / Database (Phase 6)
-// ============================================================
+#[tauri::command]
+pub async fn download_model(url: String, output_path: String, window: tauri::Window) -> Result<String, String> {
+    let win = window.clone();
+    let path_clone = output_path.clone();
+    tokio::task::spawn_blocking(move || crate::download::download_file(&url, &path_clone, &win))
+        .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())?;
+    Ok(output_path)
+}
 
 #[tauri::command]
 pub async fn list_history(limit: i64, offset: i64) -> Result<Vec<crate::db::TaskRecord>, String> {
     tokio::task::spawn_blocking(move || crate::db::list_tasks(limit, offset))
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
-        .map_err(|e| e.to_string())
+        .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_task(task_id: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || crate::db::delete_task(&task_id))
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
-        .map_err(|e| e.to_string())
+        .await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
 }
-// ============================================================
-// Model management (Phase 3-4)
-// ============================================================
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ModelStatus {
-    pub name: String,
-    pub installed: bool,
-    pub size_bytes: Option<u64>,
-    pub required: bool,
-}
+pub struct ModelStatus { pub name: String, pub installed: bool, pub size_bytes: Option<u64>, pub required: bool }
 
 #[tauri::command]
 pub async fn check_models() -> Result<Vec<ModelStatus>, String> {
@@ -123,10 +77,5 @@ pub async fn check_models() -> Result<Vec<ModelStatus>, String> {
 
 #[tauri::command]
 pub async fn get_app_config() -> Result<crate::AppConfig, String> {
-    Ok(crate::AppConfig {
-        models_dir: "./models".into(),
-        output_dir: "./output".into(),
-        ffmpeg_path: "ffmpeg".into(),
-        download_mirror: "https://www.modelscope.cn".into(),
-    })
+    Ok(crate::AppConfig { models_dir: "./models".into(), output_dir: "./output".into(), ffmpeg_path: "ffmpeg".into(), download_mirror: "https://www.modelscope.cn".into() })
 }
