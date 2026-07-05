@@ -1,4 +1,4 @@
-// SQLite database module for task history and settings persistence
+﻿// SQLite database module for task history and settings persistence
 // Uses rusqlite with bundled SQLite (no system dependency)
 
 use rusqlite::{Connection, Result as SqlResult, params};
@@ -110,27 +110,6 @@ pub struct SegmentRecord {
 // CRUD: Tasks
 // ============================================================
 
-pub fn save_task(id: &str, name: &str, file_path: &str, file_size: i64, file_format: &str, status: &str, engine: &str) -> anyhow::Result<()> {
-    let c = conn().lock().unwrap();
-    c.execute(
-        "INSERT INTO tasks (id, name, file_path, file_size, file_format, status, engine)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-         ON CONFLICT(id) DO UPDATE SET
-            status=excluded.status, updated_at=datetime('now')",
-        params![id, name, file_path, file_size, file_format, status, engine],
-    )?;
-    Ok(())
-}
-
-pub fn update_task_status(id: &str, status: &str) -> anyhow::Result<()> {
-    let c = conn().lock().unwrap();
-    c.execute(
-        "UPDATE tasks SET status=?1, updated_at=datetime('now') WHERE id=?2",
-        params![status, id],
-    )?;
-    Ok(())
-}
-
 pub fn list_tasks(limit: i64, offset: i64) -> anyhow::Result<Vec<TaskRecord>> {
     let c = conn().lock().unwrap();
     let mut stmt = c.prepare(
@@ -191,59 +170,7 @@ pub fn delete_task(id: &str) -> anyhow::Result<()> {
 // CRUD: Transcriptions
 // ============================================================
 
-pub fn save_transcription(
-    task_id: &str,
-    engine: &str,
-    full_text: &str,
-    duration_secs: f64,
-    segments: &[(f64, f64, &str)],
-) -> anyhow::Result<()> {
-    let c = conn().lock().unwrap();
-
-    let tx_id = uuid::Uuid::new_v4().to_string();
-    c.execute(
-        "INSERT INTO transcriptions (id, task_id, engine, full_text, duration_secs)
-         VALUES (?1, ?2, ?3, ?4, ?5)
-         ON CONFLICT(task_id) DO UPDATE SET
-            engine=excluded.engine, full_text=excluded.full_text,
-            duration_secs=excluded.duration_secs, created_at=datetime('now')",
-        params![tx_id, task_id, engine, full_text, duration_secs],
-    )?;
-
-    // Insert segments
-    for (start, end, text) in segments {
-        c.execute(
-            "INSERT INTO segments (task_id, start_time, end_time, text) VALUES (?1, ?2, ?3, ?4)",
-            params![task_id, start, end, text],
-        )?;
-    }
-
-    // Update task status
-    update_task_status(task_id, "completed")?;
-    Ok(())
-}
-
 // ============================================================
 // Settings
 // ============================================================
 
-pub fn get_setting(key: &str) -> anyhow::Result<Option<String>> {
-    let c = conn().lock().unwrap();
-    let mut stmt = c.prepare("SELECT value FROM settings WHERE key=?1")?;
-    let result = stmt.query_row(params![key], |row| row.get::<_, String>(0));
-    match result {
-        Ok(v) => Ok(Some(v)),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-        Err(e) => Err(e.into()),
-    }
-}
-
-pub fn set_setting(key: &str, value: &str) -> anyhow::Result<()> {
-    let c = conn().lock().unwrap();
-    c.execute(
-        "INSERT INTO settings (key, value) VALUES (?1, ?2)
-         ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        params![key, value],
-    )?;
-    Ok(())
-}

@@ -1,8 +1,7 @@
-use crate::ffmpeg;
+﻿use crate::ffmpeg;
 use tauri::Manager;
 use crate::{AudioExtractArgs, FileInfo};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 #[tauri::command] pub async fn extract_audio(args: AudioExtractArgs, window: tauri::Window) -> Result<String, String> {
     let win = window.clone();
@@ -49,19 +48,14 @@ fn find_models_dir() -> std::path::PathBuf {
     let d = find_models_dir();
     let ck = |s:&str,f:&str|->bool { d.join(s).exists() && std::fs::read_dir(d.join(s)).ok().and_then(|mut e| e.find_map(|x| x.ok().and_then(|x| { let p=x.path(); if p.is_dir() { p.join(f).exists().then_some(true) } else { (p.file_name().map_or(false,|n|n==f)).then_some(true) } }))).unwrap_or(false) };
     Ok(vec![
-        ModelStatus { name: "SenseVoice-Small (蹇€熷紩鎿?".into(), installed: ck("sense-voice-small","model.int8.onnx"), size_bytes: Some(233_000_000), required: true },
-        ModelStatus { name: "Paraformer-Large (绮惧噯寮曟搸)".into(), installed: ck("paraformer-large","model.int8.onnx"), size_bytes: Some(231_000_000), required: false },
-        ModelStatus { name: "Silero-VAD (璇煶鍒嗘)".into(), installed: ck("silero-vad","silero_vad.onnx"), size_bytes: Some(1_000_000), required: true },
-        ModelStatus { name: "CT-Transformer (鏍囩偣)".into(), installed: ck("punct-ct-transformer","model.onnx"), size_bytes: Some(100_000_000), required: false },
+        ModelStatus { name: "SenseVoice-Small (韫囶偊鈧喎绱╅幙?".into(), installed: ck("sense-voice-small","model.int8.onnx"), size_bytes: Some(233_000_000), required: true },
+        ModelStatus { name: "Paraformer-Large (缁儳鍣鏇熸惛)".into(), installed: ck("paraformer-large","model.int8.onnx"), size_bytes: Some(231_000_000), required: false },
+        ModelStatus { name: "Silero-VAD (鐠囶參鐓堕崚鍡橆唽)".into(), installed: ck("silero-vad","silero_vad.onnx"), size_bytes: Some(1_000_000), required: true },
+        ModelStatus { name: "CT-Transformer (閺嶅洨鍋?".into(), installed: ck("punct-ct-transformer","model.onnx"), size_bytes: Some(100_000_000), required: false },
     ])
 }
 #[tauri::command] pub async fn get_app_config() -> Result<crate::AppConfig, String> {
     Ok(crate::AppConfig { models_dir: "./models".into(), output_dir: "./output".into(), ffmpeg_path: "ffmpeg".into(), download_mirror: "https://www.modelscope.cn".into() })
-}
-#[tauri::command] pub async fn download_model(url: String, output_path: String, window: tauri::Window) -> Result<String, String> {
-    let win = window.clone(); let pc = output_path.clone();
-    tokio::task::spawn_blocking(move || crate::download::download_file(&url, &pc, &win)).await.map_err(|e| format!("Join: {}", e))?.map_err(|e| e.to_string())?;
-    Ok(output_path)
 }
 
 #[tauri::command]

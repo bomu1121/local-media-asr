@@ -1,26 +1,9 @@
-use crate::{AudioExtractArgs, FileInfo, TaskProgress};
+﻿use crate::{AudioExtractArgs, FileInfo, TaskProgress};
 use anyhow::{Context, Result};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use tauri::Emitter;
-
-/// Duration regex: matches ffmpeg "Duration: HH:MM:SS.ms" output
-fn parse_duration(line: &str) -> Option<f64> {
-    let prefix = "Duration: ";
-    let pos = line.find(prefix)?;
-    let rest = &line[pos + prefix.len()..];
-    let time_str = rest.split(',').next()?;
-    let parts: Vec<&str> = time_str.split(':').collect();
-    if parts.len() == 3 {
-        let h: f64 = parts[0].parse().ok()?;
-        let m: f64 = parts[1].parse().ok()?;
-        let s: f64 = parts[2].parse().ok()?;
-        Some(h * 3600.0 + m * 60.0 + s)
-    } else {
-        None
-    }
-}
 
 /// Time regex: matches ffmpeg "time=HH:MM:SS.ms" progress output
 fn parse_time(line: &str) -> Option<f64> {

@@ -1,11 +1,10 @@
-use serde::{Deserialize, Serialize};
+﻿use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod commands;
 mod ffmpeg;
 mod export;
 mod db;
-mod download;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioExtractArgs {

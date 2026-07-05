@@ -53,3 +53,5 @@ src-tauri/src/refine.rs
 
 # PyInstaller output
 asr_worker.exe
+# PyInstaller build artifacts
+build/
