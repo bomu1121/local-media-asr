@@ -48,10 +48,10 @@ fn find_models_dir() -> std::path::PathBuf {
     let d = find_models_dir();
     let ck = |s:&str,f:&str|->bool { d.join(s).exists() && std::fs::read_dir(d.join(s)).ok().and_then(|mut e| e.find_map(|x| x.ok().and_then(|x| { let p=x.path(); if p.is_dir() { p.join(f).exists().then_some(true) } else { (p.file_name().map_or(false,|n|n==f)).then_some(true) } }))).unwrap_or(false) };
     Ok(vec![
-        ModelStatus { name: "SenseVoice-Small (韫囶偊鈧喎绱╅幙?".into(), installed: ck("sense-voice-small","model.int8.onnx"), size_bytes: Some(233_000_000), required: true },
-        ModelStatus { name: "Paraformer-Large (缁儳鍣鏇熸惛)".into(), installed: ck("paraformer-large","model.int8.onnx"), size_bytes: Some(231_000_000), required: false },
-        ModelStatus { name: "Silero-VAD (鐠囶參鐓堕崚鍡橆唽)".into(), installed: ck("silero-vad","silero_vad.onnx"), size_bytes: Some(1_000_000), required: true },
-        ModelStatus { name: "CT-Transformer (閺嶅洨鍋?".into(), installed: ck("punct-ct-transformer","model.onnx"), size_bytes: Some(100_000_000), required: false },
+        ModelStatus { name: "SenseVoice-Small (快速引擎)".into(), installed: ck("sense-voice-small","model.int8.onnx"), size_bytes: Some(233_000_000), required: true },
+        ModelStatus { name: "Paraformer-Large (精准引擎)".into(), installed: ck("paraformer-large","model.int8.onnx"), size_bytes: Some(231_000_000), required: false },
+        ModelStatus { name: "Silero-VAD (语音分段)".into(), installed: ck("silero-vad","silero_vad.onnx"), size_bytes: Some(1_000_000), required: true },
+        ModelStatus { name: "CT-Transformer (标点)".into(), installed: ck("punct-ct-transformer","model.onnx"), size_bytes: Some(100_000_000), required: false },
     ])
 }
 #[tauri::command] pub async fn get_app_config() -> Result<crate::AppConfig, String> {

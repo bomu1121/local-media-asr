@@ -14,19 +14,18 @@
     {
       "identifier": "shell:allow-execute",
       "allow": [
-        { "name": "python", "cmd": "python", "args": true },
-        { "name": "asr-worker", "cmd": "asr_worker.exe", "args": true }
+        { "name": "python", "cmd": "python", "args": true }
       ]
     },
     {
       "identifier": "shell:allow-spawn",
       "allow": [
         { "name": "python", "cmd": "python", "args": true },
-        { "name": "asr-worker", "cmd": "asr_worker.exe", "args": true }
+        { "name": "binaries/asr_worker", "sidecar": true, "args": true }
       ]
     },
     "process:default",
     "fs:allow-stat"
   ],
-  "": "../gen/schemas/desktop-schema.json"
+  "$schema": "../gen/schemas/desktop-schema.json"
 }
