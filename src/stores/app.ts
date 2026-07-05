@@ -1,5 +1,5 @@
-﻿import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { defineStore } from "pinia";
+import { ref, computed, watch } from "vue";
 
 export type EngineType = "fast" | "precise";
 export type ExportFormat = "txt" | "srt" | "lrc" | "json" | "vtt";
@@ -42,6 +42,35 @@ export interface AppSettings {
   exportFormat: ExportFormat;
   vad: VadSettings;
   outputDir: string;
+  aiApiKey: string;
+  enableAiRefine: boolean;
+}
+
+const STORAGE_KEY = "asr-settings";
+
+function defaultSettings(): AppSettings {
+  return {
+    engine: "fast",
+    denoise: false,
+    punctuation: true,
+    exportFormat: "txt",
+    vad: { enabled: true, threshold: 0.5, minSpeechDuration: 0.3, minSilenceDuration: 0.5, maxSegmentDuration: 60 },
+    outputDir: "",
+    aiApiKey: "",
+    enableAiRefine: true,
+  };
+}
+
+function loadSettings(): AppSettings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return { ...defaultSettings(), ...JSON.parse(raw) };
+  } catch (_e: any) { /* ignore corrupt data */ }
+  return defaultSettings();
+}
+
+function saveSettings(s: AppSettings) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (_e: any) { /* ignore */ }
 }
 
 export const useAppStore = defineStore("app", () => {
@@ -51,24 +80,14 @@ export const useAppStore = defineStore("app", () => {
   const activeTab = ref<"transcribe" | "history" | "settings">("transcribe");
   const activeHistoryResult = ref<TranscriptionResult | null>(null);
   const activeHistoryId = ref<string | null>(null);
+  const settings = ref<AppSettings>(loadSettings());
+
   const activeTask = computed(() =>
     tasks.value.find((t) => t.id === activeTaskId.value) ?? null
   );
 
-  const settings = ref<AppSettings>({
-    engine: "fast",
-    denoise: false,
-    punctuation: true,
-    exportFormat: "txt",
-    vad: {
-      enabled: true,
-      threshold: 0.5,
-      minSpeechDuration: 0.3,
-      minSilenceDuration: 0.5,
-      maxSegmentDuration: 60,
-    },
-    outputDir: "",
-  });
+  // Persist settings to localStorage whenever they change
+  watch(settings, (s) => saveSettings(s), { deep: true });
 
   function addTask(file: Omit<TaskFile, "id" | "status" | "progress">) {
     const task: TaskFile = {

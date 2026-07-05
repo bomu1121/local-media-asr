@@ -5,8 +5,11 @@ import { CloudUploadOutline, PlayOutline, MusicalNotesOutline, FilmOutline, Fold
 import { useAppStore } from "../stores/app";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { processMedia, getMediaInfo, checkFfmpeg, downloadFfmpeg } from "../utils/invoke";
+import { getMediaInfo, checkFfmpeg, downloadFfmpeg } from "../utils/invoke";
+import { stat } from "@tauri-apps/plugin-fs";
+import { Command } from "@tauri-apps/plugin-shell";
 import { onExtractProgress, onTranscribeProgress } from "../utils/events";
+
 import type { TaskFile, TranscriptionResult } from "../stores/app";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
@@ -43,7 +46,11 @@ async function handleFileSelect() {
     const name = filePath.split("\\").pop()||filePath;
     const ext = name.split(".").pop()||"";
     const task = store.addTask({ name, path: filePath, size: 0, format: ext });
-    getMediaInfo(filePath).then(info => { if (info.size>0) task.size = info.size; }).catch(()=>{});
+    stat(filePath).then(s => {
+      // Find and update via store to ensure reactivity
+      const t = store.tasks.find(t2 => t2.id === task.id);
+      if (t) t.size = s.size;
+    }).catch((e: any) => { console.error("[stat] failed:", e); });
   }
   message.success(`已添加 ${files.length} 个文件`);
 }
@@ -59,19 +66,85 @@ async function handleProcess(task: TaskFile) {
   if (!ffmpegReady.value) { message.error("FFmpeg 未就绪"); return; }
   store.selectTask(task.id);
   task.status = "processing"; task.progress = 0;
+
   try {
-    const result = await processMedia(task.path, store.settings.engine);
-    task.result = result as any; task.status = "completed"; task.progress = 100;
+    // Step 1: Extract audio via Rust (FFmpeg)
+    const ext = task.path.split(".").pop()?.toLowerCase() ?? "";
+    const isWav = ext === "wav";
+    let wavPath = task.path;
+
+    if (!isWav) {
+      const parent = task.path.replace(/[\\/][^\\/]+$/, "");
+      const stem = task.path.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "output";
+      wavPath = parent + "\\" + stem + "_extracted.wav";
+
+      await invoke("extract_audio", {
+        args: { input_path: task.path, output_path: wavPath, denoise: false }
+      });
+    }
+
+    task.progress = 30;
+
+    // Step 2: Python ASR via shell plugin
+    const modelsDir = await invoke("get_app_config")
+      .then((c: any) => c.models_dir)
+      .catch(() => "D:\Develop\local-media-asr\src-tauri\models");
+
+    const cmd = Command.create("python", [
+      "D:\\Develop\\local-media-asr\\asr_worker.py",
+      "--wav", wavPath,
+      "--model", "paraformer",
+      "--models-dir", modelsDir,
+    ]);
+
+    // Use execute() to collect all output at once (simpler, avoids streaming issues)
+    task.progress = 35; // show "running" while Python works
+
+    const output = await cmd.execute();
+
+    if (output.code !== 0) {
+      const errMsg = output.stderr || "(no stderr)";
+      throw new Error("ASR worker exit code: " + output.code + "\n" + errMsg.substring(0, 500));
+    }
+
+    // Parse JSON lines from stdout
+    let resultText = "";
+    let resultSegments: any[] = [];
+    const lines = (output.stdout || "").split("\n");
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line.trim());
+        if (msg.type === "result") {
+          resultText = msg.text;
+          resultSegments = msg.segments;
+        }
+      } catch (_e: any) {}
+    }
+
+    if (!resultText) {
+      throw new Error("ASR worker produced no output. stderr: " + (output.stderr || "(empty)").substring(0, 300));
+    }
+
+    task.result = {
+      text: resultText, segments: resultSegments,
+      engine: "paraformer", duration: 0,
+    } as any;
+    task.status = "completed";
+    task.progress = 100;
     message.success("处理完成");
-  } catch(e: any) { task.status = "failed"; task.error = String(e); message.error(`处理失败: ${e}`); }
+  } catch (e: any) {
+    task.status = "failed"; task.error = String(e);
+    message.error("处理失败: " + e);
+  }
 }
 
 async function openFolder(filePath: string) {
-  try { await invoke("open_folder", { path: filePath.replace(/[^\\]+$/, "") }); } catch { message.info(`路径: ${filePath}`); }
+  try { await invoke("open_folder", { path: filePath.replace(/[^\\]+$/, "") }); } catch (_e: any) {message.info(`路径: ${filePath}`); }
 }
 
 onMounted(async () => {
-  try { ffmpegReady.value = true; await checkFfmpeg(); } catch { ffmpegReady.value = false; }
+  try { ffmpegReady.value = true; await checkFfmpeg(); } catch (_e: any) {ffmpegReady.value = false; }
   try {
     unlistenExtract = await onExtractProgress(p => {
       const t = tasks.value.find(t2 => t2.id===store.activeTaskId);

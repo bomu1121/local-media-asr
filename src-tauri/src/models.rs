@@ -24,22 +24,22 @@ impl ModelRegistry {
             ModelStatus {
                 name: "SenseVoice-Small (int8)".into(),
                 model_id: "sense-voice-small".into(),
-                installed: dir.join("sense-voice-small").exists(),
+                installed: dir.join("sense-voice-small").join("model.int8.onnx").exists(),
                 size_bytes: Some(230_000_000),
                 required: true,
                 download_url: Some(
-                    "https://www.modelscope.cn/models/k2-fsa/sense-voice-small-onnx/resolve/master/model.int8.onnx"
+                    "https://modelscope.cn/models/k2-fsa/sense-voice-small-onnx/raw/master/model.int8.onnx"
                         .into(),
                 ),
             },
             ModelStatus {
                 name: "Paraformer-Large (int8)".into(),
                 model_id: "paraformer-large".into(),
-                installed: dir.join("paraformer-large").exists(),
+                installed: dir.join("paraformer-large").join("model.int8.onnx").exists(),
                 size_bytes: Some(227_000_000),
                 required: false,
                 download_url: Some(
-                    "https://www.modelscope.cn/models/k2-fsa/paraformer-large-onnx/resolve/master/model.int8.onnx"
+                    "https://modelscope.cn/models/k2-fsa/paraformer-large-onnx/raw/master/model.int8.onnx"
                         .into(),
                 ),
             },
@@ -47,20 +47,23 @@ impl ModelRegistry {
                 name: "Silero-VAD".into(),
                 model_id: "silero-vad".into(),
                 installed: dir.join("silero-vad").join("silero_vad.onnx").exists(),
-                size_bytes: Some(1_000_000),
+                size_bytes: Some(2_200_000),
                 required: true,
                 download_url: Some(
-                    "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+                    "https://modelscope.cn/models/k2-fsa/sherpa-onnx-silero-vad-onnx/raw/master/silero_vad.onnx"
                         .into(),
                 ),
             },
             ModelStatus {
-                name: "CT-Transformer Punct".into(),
+                name: "CT-Transformer (标点)".into(),
                 model_id: "punct-ct-transformer".into(),
-                installed: dir.join("punct-ct-transformer").exists(),
+                installed: dir.join("punct-ct-transformer").join("model.onnx").exists(),
                 size_bytes: Some(100_000_000),
                 required: false,
-                download_url: None,
+                download_url: Some(
+                    "https://modelscope.cn/models/k2-fsa/punct-ct-transformer-onnx/raw/master/model.onnx"
+                        .into(),
+                ),
             },
         ]
     }

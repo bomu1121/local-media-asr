@@ -45,3 +45,8 @@ src-tauri/sherpa-onnx-lib/
 *.wav
 
 src-tauri/*.dll
+
+# Legacy / deprecated
+dl/
+download_models.py
+src-tauri/src/refine.rs

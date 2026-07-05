@@ -32,7 +32,7 @@ const exportOptions = [
   { label: "结构化 JSON", value: "json" },
 ];
 
-onMounted(async () => { try { modelStatuses.value = await checkModels(); } catch {} });
+onMounted(async () => { try { modelStatuses.value = await checkModels(); } catch (_e: any) {} });
 async function checkFFmpeg() {
   checkingFfmpeg.value = true;
   try {
@@ -132,6 +132,23 @@ function downloadModel(modelName: string) {
           <div class="setting-row">
             <NText>导出目录</NText>
             <NInput v-model:value="store.settings.outputDir" placeholder="默认: 用户文档目录" size="small" style="width: 240px;" />
+          </div>
+        </NSpace>
+      </NCard>
+
+      <!-- AI Text Refinement -->
+      <NCard size="small" title="AI 校对">
+        <NSpace vertical :size="12">
+          <NText depth="3" style="font-size: 12px;">
+            转写完成后自动调用 DeepSeek API 修正同音错字、专有名词和标点符号
+          </NText>
+          <div class="setting-row">
+            <NText>启用 AI 校对</NText>
+            <NSwitch v-model:value="store.settings.enableAiRefine" />
+          </div>
+          <div class="setting-row" v-if="store.settings.enableAiRefine">
+            <NText>API Key</NText>
+            <NInput v-model:value="store.settings.aiApiKey" type="password" show-password-on="click" placeholder="sk-..." size="small" style="width: 280px;" />
           </div>
         </NSpace>
       </NCard>

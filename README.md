@@ -1,15 +1,15 @@
 ﻿# 本地媒体 ASR
 
-> 纯本地运行的桌面端音视频转文字工具，基于离线语音识别模型，将视频/音频中的人声快速转换为可编辑的文本与字幕，全程本地运算保障数据隐私。
+> 纯本地运行的桌面端音视频转文字工具。拖入视频/音频，自动提取人声、分段转录、AI 校对，输出可直接使用的口播文案或字幕。全程本地运算保障数据隐私。
 
 ## 功能特性
 
-- **一键暗箱处理**：选择文件 → 点击播放按钮，自动完成音频提取 + VAD 语音分段 + ASR 转写，全程一个进度条
-- **双引擎切换**：内置快速引擎（SenseVoice-Small，230MB）和精准引擎（Paraformer-Large，231MB），按需切换
-- **多格式输出**：支持 TXT / SRT / VTT / LRC / JSON 五种导出格式，一键复制或保存文件
-- **智能语音分段**：基于 Silero-VAD 自动检测语音起止点，按语义停顿智能切分段落
-- **历史记录**：转写结果自动存入 SQLite 本地数据库，支持历史回溯、复制、删除
-- **离线隐私**：全部运算在本地完成，无需联网，数据不出设备
+- **一键转录**：拖入文件 → 自动音频提取 → Python Paraformer 分段 ASR → DeepSeek AI 校对 → 输出口播级文案
+- **AI 智能校对**：转录完成后自动调用 DeepSeek API 修正同音错字、恢复专有名词、补全标点、划分段落，输出可直接发布的文案
+- **双引擎支持**：快速引擎（SenseVoice-Small）和精准引擎（Paraformer-Large），Python 侧 Paraformer 提供更高准确率
+- **多格式导出**：支持 TXT / SRT / VTT / LRC / JSON 五种格式，一键复制或保存
+- **历史记录**：转写结果自动存入 SQLite 本地数据库，支持历史回溯
+- **离线隐私**：核心计算在本地完成，AI 校对可选开启
 
 ## 技术栈
 
@@ -17,9 +17,10 @@
 |---|---|
 | 桌面框架 | Tauri 2.0 |
 | 前端 | Vue 3 + TypeScript + Naive UI |
-| ASR 引擎 | sherpa-onnx (SenseVoice-Small / Paraformer-Large) |
-| VAD | Silero-VAD (sherpa-onnx) |
-| 音视频处理 | FFmpeg Sidecar |
+| ASR 引擎 | sherpa-onnx (Python Paraformer-Large / Rust SenseVoice-Small) |
+| VAD | 能量检测 + 滑动窗口分段 |
+| AI 校对 | DeepSeek API（可选，前端直连） |
+| 音视频处理 | FFmpeg（系统安装或自动下载） |
 | 本地存储 | SQLite (rusqlite) |
 | 构建 | pnpm + Vite + Cargo (MSVC) |
 
@@ -28,137 +29,69 @@
 ### 环境要求
 
 - Windows 10+ (x64)
-- [Rust](https://www.rust-lang.org/) (MSVC toolchain)
-- [Node.js](https://nodejs.org/) 18+
-- [pnpm](https://pnpm.io/)
-- [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) (C++ 桌面开发)
-- [LLVM](https://github.com/llvm/llvm-project/releases) (clang, 用于 sherpa-rs-sys 编译)
+- Python 3.12+（需安装 `sherpa-onnx`, `numpy`）
+- FFmpeg（需在 PATH 中或通过应用内下载）
 
 ### 安装依赖
 
 ```bash
+# 前端
 pnpm install
+
+# Python（ASR worker）
+pip install sherpa-onnx numpy
 ```
 
-### 准备模型
+### 下载模型
 
-下载以下模型到 `models/` 目录：
-
-| 模型 | 大小 | 用途 | 必需 |
-|---|---|---|---|
-| [SenseVoice-Small int8](https://www.modelscope.cn/models/iic/SenseVoiceSmall/int8) | 233MB | 快速转写引擎 | ✓ |
-| [Paraformer-Large int8](https://www.modelscope.cn/models/iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch) | 231MB | 精准引擎（含时间戳） | |
-| [Silero-VAD](https://github.com/k2-fsa/sherpa-onnx/releases) | 1MB | 语音活动检测 | ✓ |
-| [CT-Transformer Punct](https://www.modelscope.cn/models/iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch) | 67MB | 标点恢复 | |
-
-模型目录结构：
-
-```
-models/
-  sense-voice-small/    → 内含 model.int8.onnx, tokens.txt
-  paraformer-large/     → 内含 model.int8.onnx, tokens.txt
-  silero-vad/           → 内含 silero_vad.onnx
-  punct-ct-transformer/ → 内含 model.onnx
-```
-
-### 准备 sherpa-onnx 动态库
-
-下载 `sherpa-onnx-v1.12.9-win-x64-shared.tar.bz2`，解压到 `src-tauri/sherpa-onnx-lib/`。
+将 SenseVoice-Small 或 Paraformer-Large 模型放置于 `src-tauri/models/` 目录。
 
 ### 开发运行
 
 ```bash
-dev.bat
-```
-
-或手动设置环境变量后启动：
-
-```bash
-set SHERPA_LIB_PATH=src-tauri\sherpa-onnx-lib\sherpa-onnx-v1.12.9-win-x64-shared
-set LIBCLANG_PATH=C:\Program Files\LLVM\bin
-set CI=true
 pnpm tauri dev
 ```
 
-### 构建发布包
+或双击 `dev.bat`。
 
-```bash
-pnpm tauri build
-```
+## 使用说明
+
+1. 打开应用，点击左侧文件图标或拖入音视频文件
+2. 在设置页配置 AI 校对（填入 DeepSeek API Key 并开启开关）
+3. 选中文件，点击播放按钮开始转录
+4. 等待 Python ASR 处理完成（9分钟视频约12秒）
+5. 如开启 AI 校对，转录完成后自动调用 DeepSeek 修正文本
+6. 在右侧面板切换格式查看结果，支持复制和导出
 
 ## 项目结构
 
 ```
 local-media-asr/
-  src/                          # Vue 3 前端
-    components/
-      MainLayout.vue            # 三栏布局（导航 | 内容 | 结果）
-      FileManager.vue           # 文件选择 + 一键处理 + 任务列表
-      ResultPanel.vue           # 右侧结果面板（格式切换/复制/导出）
-      TranscriptionPanel.vue    # 历史记录列表
-      SettingsPanel.vue         # 引擎/VAD/导出设置
-    stores/app.ts               # Pinia 全局状态
-    utils/invoke.ts             # Tauri 命令封装
-  src-tauri/                    # Rust 后端
-    src/
-      commands.rs               # Tauri 命令（process_media, export 等）
-      pipeline.rs               # 转写流水线（WAV → VAD → ASR → 结果）
-      asr.rs                    # ASR 引擎封装（双引擎切换）
-      ffmpeg.rs                 # FFmpeg 音频提取
-      db.rs                     # SQLite 历史记录 CRUD
-      export.rs                 # 多格式导出（TXT/SRT/VTT/LRC/JSON）
-    Cargo.toml
-  models/                       # AI 模型文件（.onnx）
-  dev.bat                       # 开发启动脚本
+├── src/                    # Vue 前端
+│   ├── components/         # Vue 组件
+│   │   ├── FileManager.vue # 文件管理 + 转录触发
+│   │   ├── ResultPanel.vue # 结果展示 + AI 校对
+│   │   └── SettingsPanel.vue # 设置（引擎/API Key）
+│   ├── stores/app.ts       # Pinia 状态管理（含 localStorage 持久化）
+│   └── utils/              # invoke / events / types
+├── src-tauri/              # Rust 后端
+│   └── src/
+│       ├── commands.rs     # Tauri commands
+│       ├── pipeline.rs     # 转录流水线
+│       ├── vad.rs          # VAD 模块
+│       ├── ffmpeg.rs       # FFmpeg 集成
+│       └── refine.rs       # DeepSeek API（后端备选）
+├── asr_worker.py           # Python ASR worker（主力）
+└── models/                 # ASR 模型文件
 ```
 
-## 架构
+## 常见问题
 
-```
-前端 UI (Vue3 + NaiveUI)
-    ↓ invoke/event (IPC)
-Rust 核心服务
-    ├── FFmpeg Sidecar (音频提取: 视频→16kHz mono WAV)
-    ├── VAD (Silero-VAD: 语音端点检测与智能分段)
-    ├── ASR 调度 (SenseVoice-Small / Paraformer-Large)
-    ├── 后处理 (标点恢复、多格式生成)
-    └── SQLite (历史记录持久化)
-    ↓ FFI
-sherpa-onnx C API DLL (v1.12.9)
-    └── ONNX Runtime (推理引擎)
-```
+**Q: 转录结果碎片化？**  
+A: 检查设置中的 VAD 参数，或直接使用 Paraformer 引擎。Paraformer 配合 AI 校对可输出流畅长文案。
 
+**Q: AI 校对没有生效？**  
+A: 确认设置页已填入 DeepSeek API Key 并开启开关。API Key 保存在浏览器 localStorage 中，刷新页面不会丢失。
 
-## 发布
-
-### 构建安装包
-
-```bash
-# 1. 安装 NSIS（Tauri 打包需要）
-# 下载 https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip
-# 解压到 %LOCALAPPDATA%\tauri\NSIS\Bundle\
-
-# 2. 设置环境
-set SHERPA_LIB_PATH=src-tauri\sherpa-onnx-lib\sherpa-onnx-v1.12.9-win-x64-shared
-set LIBCLANG_PATH=C:\Program Files\LLVM\bin
-set CI=true
-
-# 3. 构建
-pnpm tauri build
-```
-
-构建产物在 `src-tauri/target/release/bundle/nsis/`，包含：
-- `local-media-asr_0.1.0_x64-setup.exe` — 安装包（含 exe + sherpa-onnx DLL + onnxruntime DLL）
-
-### 发布到 GitHub
-
-1. 前往 [Releases](https://github.com/bomu1121/local-media-asr/releases/new)
-2. Tag: `v0.1.0`，上传 `local-media-asr_0.1.0_x64-setup.exe`
-3. 发布
-
-### 用户安装后
-
-安装包约 7 MB。首次启动会自动下载 FFmpeg (~80 MB)。AI 模型需手动放置到 `%APPDATA%\local-media-asr\models\`（后续版本将内置下载通道）。
-## License
-
-MIT
+**Q: 转写进度卡在 30%？**  
+A: Python ASR 处理期间进度条跳变不明显，等待 10-60 秒（取决于音频长度）后会自动完成。

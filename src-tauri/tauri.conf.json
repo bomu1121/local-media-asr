@@ -12,7 +12,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "本地媒体ASR - 离线音视频转文字",
+        "title": "\u93c8\ue100\u6e74\u6fef\u638d\u7d8bASR - \u7ec2\u8364\u568e\u95ca\u5ba0\ue74b\u68f0\u6223\u6d46\u93c2\u56e7\u74e7",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
@@ -47,10 +47,10 @@
       }
     },
     "resources": [
-      "sherpa-onnx-c-api.dll",
-      "sherpa-onnx-cxx-api.dll",
-      "onnxruntime.dll",
-      "onnxruntime_providers_shared.dll"
+      "sherpa-onnx-lib\\sherpa-onnx-v1.12.9-win-x64-shared\\lib\\sherpa-onnx-c-api.dll",
+      "sherpa-onnx-lib\\sherpa-onnx-v1.12.9-win-x64-shared\\lib\\sherpa-onnx-cxx-api.dll",
+      "sherpa-onnx-lib\\sherpa-onnx-v1.12.9-win-x64-shared\\lib\\onnxruntime.dll",
+      "sherpa-onnx-lib\\sherpa-onnx-v1.12.9-win-x64-shared\\lib\\onnxruntime_providers_shared.dll"
     ]
   },
   "plugins": {}

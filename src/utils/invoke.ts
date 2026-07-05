@@ -1,4 +1,4 @@
-﻿import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import type { AudioExtractArgs, FileInfo, AppConfig, ModelStatus, TaskRecord, TranscriptionResult } from "./types";
 
 export async function extractAudio(args: AudioExtractArgs): Promise<string> {
@@ -17,7 +17,6 @@ export async function downloadFfmpeg(): Promise<string> {
 export async function processMedia(filePath: string, engineType: string): Promise<TranscriptionResult> {
   return invoke("process_media", { filePath, engineType });
 }
-/** Backward compat: transcribe already-extracted WAV */
 
 /** Get formatted export content for preview (TXT/SRT/VTT/LRC/JSON) */
 export async function exportResultString(format: string, result: TranscriptionResult): Promise<string> {
@@ -38,4 +37,19 @@ export async function listHistory(limit: number, offset: number): Promise<TaskRe
 }
 export async function deleteTask(taskId: string): Promise<void> {
   return invoke("delete_task", { taskId });
+}
+
+/** Download a model by id and URL, saving to the models directory */
+export async function downloadModel(url: string, outputPath: string): Promise<string> {
+  return invoke("download_model", { url, outputPath });
+}
+
+/** Download a model by model_id with the given URL */
+export async function downloadModelById(modelId: string, downloadUrl: string): Promise<string> {
+  return invoke("download_model_by_id", { modelId, downloadUrl });
+}
+
+/** AI text refinement via DeepSeek API */
+export async function refineAsrText(rawText: string, apiKey: string): Promise<string> {
+  return invoke("refine_asr_text", { rawText, apiKey });
 }

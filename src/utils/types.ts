@@ -25,9 +25,11 @@ export interface AppConfig {
 
 export interface ModelStatus {
   name: string;
+  model_id: string;
   installed: boolean;
   size_bytes: number | null;
   required: boolean;
+  download_url: string | null;
 }
 
 export interface TranscriptionArgs {

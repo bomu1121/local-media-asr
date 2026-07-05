@@ -16,3 +16,11 @@ export function onTranscribeProgress(
     callback(event.payload as TaskProgress);
   });
 }
+
+export function onDownloadProgress(
+  callback: (progress: TaskProgress) => void
+): Promise<UnlistenFn> {
+  return listen<TaskProgress>("download-progress", (event) => {
+    callback(event.payload as TaskProgress);
+  });
+}

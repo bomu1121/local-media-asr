@@ -34,23 +34,59 @@ pub fn download_file(
         0
     };
 
-    // Get remote file size via HEAD request
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(std::time::Duration::from_secs(30))
-        .timeout_read(std::time::Duration::from_secs(300))
+        .timeout_read(std::time::Duration::from_secs(600))
+        .redirects(5)
         .build();
 
-    // First, check total size
-    let total_size = match agent.head(url).call() {
-        Ok(resp) => resp
-            .header("content-length")
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(0),
-        Err(_) => 0,
+    // Probe the URL: verify it returns binary content, not an HTML page
+    let total_size = {
+        let resp = agent
+            .head(url)
+            .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+            .call()
+            .ok();
+        resp.and_then(|r| r.header("content-length").and_then(|v| v.parse::<u64>().ok()))
+            .unwrap_or(0)
     };
 
+    // If server doesn't give content-length via HEAD, do a quick GET probe
+    let is_valid = if total_size == 0 {
+        match agent
+            .get(url)
+            .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+            .set("Accept", "application/octet-stream, */*")
+            .call()
+        {
+            Ok(resp) => {
+                let mut reader = resp.into_reader();
+                let mut probe = [0u8; 4];
+                let n = reader.read(&mut probe).unwrap_or(0);
+                // Check if response is HTML (starts with <) - if so, the URL needs auth
+                if n > 0 && probe[0] == b'<' {
+                    return Err(anyhow::anyhow!(
+                        "Download URL returned HTML instead of binary data. The file may require authentication or the URL may be incorrect."
+                    ));
+                }
+                // Probe passed — but we consumed the response. Fall through to re-download.
+                // For models < probe size, we already have them
+                if n < 4 { probe[0] != b'<' } else { true }
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!("Failed to connect to download server: {}", e));
+            }
+        }
+    } else {
+        true
+    };
+
+    if !is_valid {
+        return Err(anyhow::anyhow!("Download source returned unexpected content"));
+    }
+
     // If file already complete, skip download
-    if existing_size > 0 && existing_size == total_size {
+    if existing_size > 0 && total_size > 0 && existing_size >= total_size {
         let _ = window.emit(
             "download-progress",
             TaskProgress {
@@ -63,23 +99,37 @@ pub fn download_file(
         return Ok(());
     }
 
-    // Start download request with optional Range header
+    // Start download with proper headers
     let req = if existing_size > 0 {
         agent
             .get(url)
+            .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+            .set("Accept", "application/octet-stream, */*")
             .set("Range", &format!("bytes={}-", existing_size))
     } else {
-        agent.get(url)
+        agent
+            .get(url)
+            .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+            .set("Accept", "application/octet-stream, */*")
     };
 
     let resp = req.call().context("Failed to connect to download server")?;
+
+    // Verify response is valid binary
+    let content_type = resp.header("content-type").unwrap_or("");
+    if content_type.contains("text/html") {
+        return Err(anyhow::anyhow!(
+            "Server returned HTML instead of file data — the download source may require authentication. Please visit {} in your browser to download the file manually.",
+            url
+        ));
+    }
 
     let content_length = resp
         .header("content-length")
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(0);
 
-    let effective_total = existing_size + content_length;
+    let effective_total = if total_size > 0 { total_size } else { existing_size + content_length };
 
     // Open file for appending (resume) or create new
     let mut file = if existing_size > 0 {
