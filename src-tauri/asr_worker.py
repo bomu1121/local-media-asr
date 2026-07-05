@@ -10,8 +10,11 @@ Outputs JSON lines to stdout:
 import sys, os
 # Force UTF-8 output for Tauri (Windows console may use GBK)
 os.environ["PYTHONIOENCODING"] = "utf-8"
-sys.stdout.reconfigure(encoding="utf-8")
-sys.stderr.reconfigure(encoding="utf-8")
+# Safe reconfigure ? stdout/stderr may be None in GUI subsystem
+if sys.stdout is not None:
+    sys.stdout.reconfigure(encoding="utf-8")
+if sys.stderr is not None:
+    sys.stderr.reconfigure(encoding="utf-8")
 
 import json, wave, time, argparse
 import numpy as np
