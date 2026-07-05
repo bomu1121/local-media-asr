@@ -50,3 +50,6 @@ src-tauri/*.dll
 dl/
 download_models.py
 src-tauri/src/refine.rs
+
+# PyInstaller output
+asr_worker.exe

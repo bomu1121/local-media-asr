@@ -1,9 +1,7 @@
 {
   "identifier": "default",
   "description": "Default capability for the main window",
-  "windows": [
-    "main"
-  ],
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:default",
@@ -16,25 +14,19 @@
     {
       "identifier": "shell:allow-execute",
       "allow": [
-        {
-          "name": "python",
-          "cmd": "python",
-          "args": true
-        }
+        { "name": "python", "cmd": "python", "args": true },
+        { "name": "asr-worker", "cmd": "asr_worker.exe", "args": true }
       ]
     },
     {
       "identifier": "shell:allow-spawn",
       "allow": [
-        {
-          "name": "python",
-          "cmd": "python",
-          "args": true
-        }
+        { "name": "python", "cmd": "python", "args": true },
+        { "name": "asr-worker", "cmd": "asr_worker.exe", "args": true }
       ]
     },
     "process:default",
     "fs:allow-stat"
   ],
-  "$schema": "../gen/schemas/desktop-schema.json"
+  "": "../gen/schemas/desktop-schema.json"
 }

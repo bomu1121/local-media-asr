@@ -1,14 +1,9 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod commands;
 mod ffmpeg;
-mod asr;
-mod vad;
-mod pipeline;
-mod models;
 mod export;
-mod punct;
 mod db;
 mod download;
 
@@ -20,30 +15,10 @@ pub struct AudioExtractArgs {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TranscriptionArgs {
-    pub audio_path: String,
-    pub engine_type: String,
-    pub use_vad: bool,
-    pub use_punctuation: bool,
-    pub vad_threshold: f32,
-    pub min_speech_duration: f32,
-    pub min_silence_duration: f32,
-    pub max_segment_duration: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TranscriptionSegment {
     pub start: f64,
     pub end: f64,
     pub text: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TranscriptionResult {
-    pub text: String,
-    pub segments: Vec<TranscriptionSegment>,
-    pub engine: String,
-    pub duration: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,6 +27,14 @@ pub struct TaskProgress {
     pub stage: String,
     pub progress: f32,
     pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TranscriptionResult {
+    pub text: String,
+    pub segments: Vec<TranscriptionSegment>,
+    pub engine: String,
+    pub duration: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -116,14 +99,13 @@ pub fn run() {
             commands::check_ffmpeg,
             commands::download_ffmpeg,
             commands::open_folder,
-            commands::process_media,
             commands::export_result_string,
             commands::save_export_file,
             commands::list_history,
             commands::delete_task,
-            commands::download_model,
             commands::check_models,
             commands::get_app_config,
+            commands::get_resource_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,4 +1,5 @@
-﻿use crate::ffmpeg;
+use crate::ffmpeg;
+use tauri::Manager;
 use crate::{AudioExtractArgs, FileInfo};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -12,40 +13,6 @@ use std::path::Path;
 }
 #[tauri::command] pub async fn check_ffmpeg() -> Result<String, String> {
     tokio::task::spawn_blocking(ffmpeg::check_ffmpeg_sync).await.map_err(|e| format!("Task join error: {}", e))?.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn process_media(file_path: String, engine_type: String, window: tauri::Window) -> Result<crate::TranscriptionResult, String> {
-    use crate::asr::{AsrEngine, EngineType};
-    use crate::pipeline;
-    use crate::vad::VadConfig;
-
-    let fp_save = file_path.clone();
-    let eng_save = engine_type.clone();
-    let audio_exts = ["wav", "mp3", "flac", "aac", "ogg", "wma", "m4a", "opus"];
-    let ext = Path::new(&file_path).extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-    let is_wav = ext == "wav";
-
-    let wav_path = if is_wav { file_path.clone() } else {
-        let parent = Path::new(&file_path).parent().and_then(|p| p.to_str()).unwrap_or(".");
-        let base = Path::new(&file_path).file_stem().and_then(|s| s.to_str()).unwrap_or("output");
-        format!("{}\\{}_extracted.wav", parent, base)
-    };
-
-    if !is_wav {
-        let args = crate::AudioExtractArgs { input_path: file_path, output_path: wav_path.clone(), denoise: false };
-        let wc = window.clone();
-        tokio::task::spawn_blocking(move || ffmpeg::extract_audio_sync(&args, &wc))
-            .await.map_err(|e| format!("Join: {}", e))?.map_err(|e| format!("Extract: {}", e))?;
-    }
-
-    let mut engine = AsrEngine::new("./models", EngineType::from_str(&engine_type));
-    engine.load().map_err(|e| format!("ASR load: {}", e))?;
-    let vad_config = VadConfig::default();
-    let win2 = window.clone();
-    let result = tokio::task::spawn_blocking(move || pipeline::transcribe_pipeline(&wav_path, &mut engine, &vad_config, true, &win2))
-        .await.map_err(|e| format!("Join: {}", e))?.map_err(|e| e.to_string())?;
-    Ok(result)
 }
 
 #[tauri::command] pub async fn export_result_string(format: String, result: crate::TranscriptionResult) -> Result<String, String> {
@@ -82,10 +49,10 @@ fn find_models_dir() -> std::path::PathBuf {
     let d = find_models_dir();
     let ck = |s:&str,f:&str|->bool { d.join(s).exists() && std::fs::read_dir(d.join(s)).ok().and_then(|mut e| e.find_map(|x| x.ok().and_then(|x| { let p=x.path(); if p.is_dir() { p.join(f).exists().then_some(true) } else { (p.file_name().map_or(false,|n|n==f)).then_some(true) } }))).unwrap_or(false) };
     Ok(vec![
-        ModelStatus { name: "SenseVoice-Small (快速引擎)".into(), installed: ck("sense-voice-small","model.int8.onnx"), size_bytes: Some(233_000_000), required: true },
-        ModelStatus { name: "Paraformer-Large (精准引擎)".into(), installed: ck("paraformer-large","model.int8.onnx"), size_bytes: Some(231_000_000), required: false },
-        ModelStatus { name: "Silero-VAD (语音分段)".into(), installed: ck("silero-vad","silero_vad.onnx"), size_bytes: Some(1_000_000), required: true },
-        ModelStatus { name: "CT-Transformer (标点)".into(), installed: ck("punct-ct-transformer","model.onnx"), size_bytes: Some(100_000_000), required: false },
+        ModelStatus { name: "SenseVoice-Small (蹇€熷紩鎿?".into(), installed: ck("sense-voice-small","model.int8.onnx"), size_bytes: Some(233_000_000), required: true },
+        ModelStatus { name: "Paraformer-Large (绮惧噯寮曟搸)".into(), installed: ck("paraformer-large","model.int8.onnx"), size_bytes: Some(231_000_000), required: false },
+        ModelStatus { name: "Silero-VAD (璇煶鍒嗘)".into(), installed: ck("silero-vad","silero_vad.onnx"), size_bytes: Some(1_000_000), required: true },
+        ModelStatus { name: "CT-Transformer (鏍囩偣)".into(), installed: ck("punct-ct-transformer","model.onnx"), size_bytes: Some(100_000_000), required: false },
     ])
 }
 #[tauri::command] pub async fn get_app_config() -> Result<crate::AppConfig, String> {
@@ -95,4 +62,11 @@ fn find_models_dir() -> std::path::PathBuf {
     let win = window.clone(); let pc = output_path.clone();
     tokio::task::spawn_blocking(move || crate::download::download_file(&url, &pc, &win)).await.map_err(|e| format!("Join: {}", e))?.map_err(|e| e.to_string())?;
     Ok(output_path)
+}
+
+#[tauri::command]
+pub fn get_resource_path(app: tauri::AppHandle) -> Result<String, String> {
+    let resource_dir = app.path().resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+    Ok(resource_dir.to_string_lossy().to_string())
 }

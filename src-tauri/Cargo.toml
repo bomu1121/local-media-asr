@@ -29,12 +29,8 @@ dirs-next = "2"
 rusqlite = { version = "0.31", features = ["bundled"] }
 ureq = "2"
 
-# Sherpa-onnx ASR engine (optional - enable when models are available)
-sherpa-rs = { version = "0.6", default-features = false, features = ["tts"], optional = true }
-
 [features]
-default = ["asr"]
-asr = ["sherpa-rs"]
+default = []
 
 [profile.release]
 panic = "abort"

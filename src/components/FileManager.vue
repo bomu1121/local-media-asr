@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { NButton, NSpace, NText, NIcon, NTag, NProgress, useMessage } from "naive-ui";
 import { CloudUploadOutline, PlayOutline, MusicalNotesOutline, FilmOutline, FolderOpenOutline } from "@vicons/ionicons5";
@@ -84,22 +84,30 @@ async function handleProcess(task: TaskFile) {
     }
 
     task.progress = 30;
+    // Step 2: ASR worker (Python in dev, sidecar exe in production)
+    const resourceDir = await invoke("get_resource_path").catch(() => "");
+    const useDev = !resourceDir;
 
-    // Step 2: Python ASR via shell plugin
-    const modelsDir = await invoke("get_app_config")
-      .then((c: any) => c.models_dir)
-      .catch(() => "D:\Develop\local-media-asr\src-tauri\models");
+    let cmd: ReturnType<typeof Command.create>;
+    if (useDev) {
+      // Dev: use python + asr_worker.py from src-tauri/
+      cmd = Command.create("python", [
+        "src-tauri\asr_worker.py",
+        "--wav", wavPath,
+        "--model", "paraformer",
+        "--models-dir", "src-tauri\models",
+      ]);
+    } else {
+      // Prod: use sidecar asr_worker.exe, models from resource dir
+      cmd = Command.sidecar("binaries/asr_worker", [
+        "--wav", wavPath,
+        "--model", "paraformer",
+        "--models-dir", resourceDir + "\models",
+      ]);
+    }
 
-    const cmd = Command.create("python", [
-      "D:\\Develop\\local-media-asr\\asr_worker.py",
-      "--wav", wavPath,
-      "--model", "paraformer",
-      "--models-dir", modelsDir,
-    ]);
-
-    // Use execute() to collect all output at once (simpler, avoids streaming issues)
-    task.progress = 35; // show "running" while Python works
-
+    // Use execute() to collect all output at once
+    task.progress = 35; // show "running" while ASR works
     const output = await cmd.execute();
 
     if (output.code !== 0) {
@@ -114,11 +122,11 @@ async function handleProcess(task: TaskFile) {
     for (const line of lines) {
       if (!line.trim()) continue;
       try {
-        const msg = JSON.parse(line.trim());
-        if (msg.type === "result") {
-          resultText = msg.text;
-          resultSegments = msg.segments;
-        }
+    const msg = JSON.parse(line.trim());
+    if (msg.type === "result") {
+      resultText = msg.text;
+      resultSegments = msg.segments;
+    }
       } catch (_e: any) {}
     }
 
@@ -164,7 +172,7 @@ onUnmounted(() => { unlistenExtract?.(); unlistenTranscribe?.(); });
     <div v-if="ffmpegReady===false" class="ffmpeg-banner">
       <NText style="font-size:13px;">FFmpeg 未就绪，请先下载</NText>
       <NButton size="tiny" type="primary" @click="handleDownloadFfmpeg" :loading="downloadingFfmpeg" class="banner-btn">
-        {{ downloadingFfmpeg ? '下载中...' : '下载 FFmpeg' }}
+    {{ downloadingFfmpeg ? '下载中...' : '下载 FFmpeg' }}
       </NButton>
     </div>
 
@@ -176,38 +184,38 @@ onUnmounted(() => { unlistenExtract?.(); unlistenTranscribe?.(); });
 
     <div v-if="tasks.length>0" class="task-section">
       <div v-for="task in tasks" :key="task.id" class="task-row"
-        :class="{ selected: store.activeTaskId===task.id }"
-        @click="store.selectTask(task.id)">
-        <NIcon size="18" :color="task.status==='failed'?'#d03050':'#999'" class="task-icon">
-          <MusicalNotesOutline v-if="isAudio(task.format)" /><FilmOutline v-else />
-        </NIcon>
-        <div class="task-info">
-          <div class="task-top">
-            <NText class="task-name">{{ task.name }}</NText>
-            <NSpace :size="8" align="center" class="task-meta">
-              <NText depth="3" style="font-size:11px;">{{ task.format.toUpperCase() }} · {{ formatSize(task.size) }}</NText>
-              <NTag :type="statusColor(task.status)" size="tiny" :bordered="false">{{ statusLabel(task.status) }}</NTag>
-            </NSpace>
-          </div>
-          <NProgress v-if="task.status==='processing'" :percentage="task.progress"
-            :height="3" :border-radius="2" style="margin-top:4px;" />
-          <NText v-if="task.error" type="error" depth="3" style="font-size:11px;">{{ task.error.substring(0,80) }}</NText>
-        </div>
-        <div class="task-actions">
-          <NButton v-if="task.status==='pending'" size="tiny" type="primary"
-            @click.stop="handleProcess(task)" class="action-btn">
-            <template #icon><NIcon size="14"><PlayOutline /></NIcon></template>
-          </NButton>
-          <NButton v-if="task.status==='completed'" size="tiny" quaternary
-            @click.stop="openFolder(task.path)" class="action-btn">
-            <template #icon><NIcon size="14"><FolderOpenOutline /></NIcon></template>
-          </NButton>
-        </div>
+    :class="{ selected: store.activeTaskId===task.id }"
+    @click="store.selectTask(task.id)">
+    <NIcon size="18" :color="task.status==='failed'?'#d03050':'#999'" class="task-icon">
+      <MusicalNotesOutline v-if="isAudio(task.format)" /><FilmOutline v-else />
+    </NIcon>
+    <div class="task-info">
+      <div class="task-top">
+        <NText class="task-name">{{ task.name }}</NText>
+        <NSpace :size="8" align="center" class="task-meta">
+          <NText depth="3" style="font-size:11px;">{{ task.format.toUpperCase() }} · {{ formatSize(task.size) }}</NText>
+          <NTag :type="statusColor(task.status)" size="tiny" :bordered="false">{{ statusLabel(task.status) }}</NTag>
+        </NSpace>
+      </div>
+      <NProgress v-if="task.status==='processing'" :percentage="task.progress"
+        :height="3" :border-radius="2" style="margin-top:4px;" />
+      <NText v-if="task.error" type="error" depth="3" style="font-size:11px;">{{ task.error.substring(0,80) }}</NText>
+    </div>
+    <div class="task-actions">
+      <NButton v-if="task.status==='pending'" size="tiny" type="primary"
+        @click.stop="handleProcess(task)" class="action-btn">
+        <template #icon><NIcon size="14"><PlayOutline /></NIcon></template>
+      </NButton>
+      <NButton v-if="task.status==='completed'" size="tiny" quaternary
+        @click.stop="openFolder(task.path)" class="action-btn">
+        <template #icon><NIcon size="14"><FolderOpenOutline /></NIcon></template>
+      </NButton>
+    </div>
       </div>
     </div>
 
     <div v-if="tasks.length===0 && ffmpegReady!==false" class="empty-hint">
-      <NText depth="3" style="font-size:13px;">选择文件后点击 ▶ 即可一键提取音频并转写</NText>
+      <NText depth="3" style="font-size:13px;">选择文件后点击 ? 即可一键提取音频并转写</NText>
     </div>
   </div>
 </template>
