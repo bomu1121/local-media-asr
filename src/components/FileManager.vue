@@ -110,7 +110,7 @@ async function handleProcess(task: TaskFile) {
       // Prod: use Rust command with CREATE_NO_WINDOW (no black box!)
       stdout = await invoke("run_asr", {
         wavPath: wavPath,
-        modelsDir: resourceDir + "\models",
+        resourceDir: resourceDir,
       });
     }
 

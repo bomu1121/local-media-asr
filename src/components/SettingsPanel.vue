@@ -8,14 +8,17 @@ import {
   FolderOpenOutline, CheckmarkCircleOutline, CloudDownloadOutline,
 } from "@vicons/ionicons5";
 import { useAppStore } from "../stores/app";
-import { checkFfmpeg, checkModels } from "../utils/invoke";
+import { checkFfmpeg, checkModels, checkEnvironment } from "../utils/invoke";
 import type { EngineType, ExportFormat } from "../stores/app";
+import type { EnvCheck } from "../utils/types";
 
 const store = useAppStore();
 const message = useMessage();
 const modelStatuses = ref<Array<{name:string;installed:boolean}>>([]);
 const ffmpegStatus = ref<string | null>(null);
 const checkingFfmpeg = ref(false);
+const envCheck = ref<EnvCheck | null>(null);
+const checkingEnv = ref(false);
 
 const engineOptions = [
   { label: "快速引擎 (SenseVoice-Small)", value: "fast",
@@ -33,6 +36,18 @@ const exportOptions = [
 ];
 
 onMounted(async () => { try { modelStatuses.value = await checkModels(); } catch (_e: any) {} });
+async function runEnvCheck() {
+  checkingEnv.value = true;
+  envCheck.value = null;
+  try {
+    envCheck.value = await checkEnvironment();
+  } catch (e: any) {
+    envCheck.value = { ok: false, items: [{ name: "Error", passed: false, detail: String(e) }] };
+  } finally {
+    checkingEnv.value = false;
+  }
+}
+
 async function checkFFmpeg() {
   checkingFfmpeg.value = true;
   try {
@@ -156,16 +171,20 @@ function downloadModel(modelName: string) {
       <!-- System Status -->
       <NCard size="small" title="系统状态">
         <NSpace vertical :size="8">
-                    <div class="setting-row">
-            <NSpace :size="8" align="center">
-              <NText>模型状态</NText>
-            </NSpace>
-            <NSpace :size="4">
-              <NTag v-for="m in modelStatuses" :key="m.name" size="tiny"
-                :type="m.installed ? 'success' : 'warning'" :bordered="false">
-                {{ m.name }}: {{ m.installed ? '已安装' : '未下载' }}
-              </NTag>
-            </NSpace>
+          <div class="setting-row">
+            <NButton size="tiny" @click="runEnvCheck" :loading="checkingEnv" secondary>
+              <template #icon><NIcon><CheckmarkCircleOutline /></NIcon></template>
+              环境检查
+            </NButton>
+            <NTag v-if="envCheck" :type="envCheck.ok ? 'success' : 'error'" size="tiny" :bordered="false">
+              {{ envCheck.ok ? '全部通过' : '存在问题' }}
+            </NTag>
+          </div>
+          <div v-if="envCheck" v-for="item in envCheck.items" :key="item.name" class="setting-row" style="font-size: 12px;">
+            <NText :type="item.passed ? 'success' : 'error'" style="font-size: 12px;">
+              {{ item.passed ? 'OK' : 'FAIL' }} {{ item.name }}
+            </NText>
+            <NText depth="3" style="font-size: 11px; max-width: 220px; text-align: right;">{{ item.detail }}</NText>
           </div>
         </NSpace>
       </NCard>

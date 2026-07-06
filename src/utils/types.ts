@@ -82,3 +82,13 @@ export interface TaskRecord {
     segments: Array<{ start_time: number; end_time: number; text: string }>;
   } | null;
 }
+export interface EnvCheckItem {
+  name: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface EnvCheck {
+  ok: boolean;
+  items: EnvCheckItem[];
+}

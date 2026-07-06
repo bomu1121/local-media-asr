@@ -118,42 +118,33 @@ async function callDeepSeekAPI(rawText: string, apiKey: string): Promise<string>
   return data.choices[0].message.content;
 }
 
-// ---- Streamed AI refinement: split segments, refine in parallel with concurrency limit ----
-async function streamRefine() {
-  const result = activeResult.value;
-  if (!result || !store.settings.enableAiRefine || !store.settings.aiApiKey) return;
-
-  const segments = result.segments ?? [];
-  if (segments.length === 0) {
-    // No segments: refine the full text
-    refineProgress.value = { done: 0, total: 1 };
-    try {
-      displayText.value = await callDeepSeekAPI(result.text, store.settings.aiApiKey);
-      refineProgress.value = { done: 1, total: 1 };
-    } catch (e: any) {
-      console.error("Refine failed:", e);
-      displayText.value = result.text;
-      refineFailed.value = true;
-    }
-    displaySegments.value = segments;
-    return;
-  }
-
-  // Join all segments into one text for single-pass full-context refine
-  const fullRaw = segments.map(s => s.text).join("\n");
+// ---- AI refinement ----
+let hasAutoRefined = false;
+async function runRefine() {
+  const raw = displayText.value;
+  if (!raw || !store.settings.aiApiKey) return;
   refineProgress.value = { done: 0, total: 1 };
   refineFailed.value = false;
-
   try {
-    displayText.value = await callDeepSeekAPI(fullRaw, store.settings.aiApiKey);
+    const refined = await callDeepSeekAPI(raw, store.settings.aiApiKey);
+    displayText.value = refined;
     refineProgress.value = { done: 1, total: 1 };
+    // Persist to store
+    const task = activeTask.value;
+    if (task?.result) {
+      task.result.text = refined;
+    }
   } catch (e: any) {
-    console.error("Refine failed:", e);
-    displayText.value = fullRaw;
+    console.error('Refine failed:', e);
     refineFailed.value = true;
   }
-  displaySegments.value = segments;
 }
+
+// ---- Format conversion helpers ----
+function fmtHms(s: number): string { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=Math.floor(s%60),ms=Math.floor((s%1)*1000); return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')+','+String(ms).padStart(3,'0'); }
+function fmtHmsVtt(s: number): string { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=Math.floor(s%60),ms=Math.floor((s%1)*1000); return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')+'.'+String(ms).padStart(3,'0'); }
+function fmtLrc(s: number): string { const m=Math.floor(s/60),sec=(s%60).toFixed(2); return '['+String(m).padStart(2,'0')+':'+String(Number(sec)<10?'0':'')+sec+']'; }
+const formattedText = computed(()=>{const t=displayText.value,segs=displaySegments.value;switch(previewFormat.value){case'txt':return t;case'srt':return segs.length?segs.map((s,i)=>String(i+1)+'\n'+fmtHms(s.start)+' --> '+fmtHms(s.end)+'\n'+s.text+'\n').join('\n'):t;case'vtt':return segs.length?'WEBVTT\n\n'+segs.map((s,i)=>String(i+1)+'\n'+fmtHmsVtt(s.start)+' --> '+fmtHmsVtt(s.end)+'\n'+s.text+'\n').join('\n'):t;case'lrc':return segs.length?segs.map(s=>fmtLrc(s.start)+s.text).join('\n'):t;case'json':return JSON.stringify({text:t,segments:segs},null,2);default:return t;}});
 
 // ---- Watch: when a new transcription result arrives, start streamed refinement ----
 watch(activeResult, (result) => {
@@ -168,7 +159,7 @@ watch(activeResult, (result) => {
   // If AI refine enabled: wait, don't show raw text
   if (store.settings.enableAiRefine && store.settings.aiApiKey) {
     // Don't set displayText yet - streamRefine will populate it as chunks complete
-    streamRefine();
+    runRefine();
   } else {
     // No AI: show raw text directly
     displayText.value = result.text;
@@ -179,7 +170,7 @@ watch(activeResult, (result) => {
 // ---- Actions ----
 async function handleCopy() {
   try {
-    await navigator.clipboard.writeText(displayText.value);
+    await navigator.clipboard.writeText(formattedText.value);
     copying.value = true;
     message.success("已复制");
     setTimeout(() => (copying.value = false), 2000);
@@ -195,8 +186,9 @@ async function handleExport() {
   try {
     const { exportResultString, saveExportFile } = await import("../utils/invoke");
     const ext = previewFormat.value;
+    const updatedResult = { ...result, text: displayText.value };
     const outPath = `${store.settings.outputDir || "."}\\transcription_${Date.now()}.${ext}`;
-    await saveExportFile(ext, outPath, result);
+    await saveExportFile(ext, outPath, updatedResult);
     message.success("已导出");
   } catch (e: any) {
     message.error(`导出失败: ${e}`);
@@ -219,6 +211,7 @@ async function handleExport() {
         {{ tab.label }}
       </button>
       <NSpace :size="4" class="tab-actions">
+        <NButton v-if="displayText && store.settings.aiApiKey && !(refineProgress.done >= refineProgress.total && !refineFailed)" size="tiny" quaternary @click="runRefine" class="icon-btn" title="AI ??"><template #icon><NIcon color="#7c3aed"><SparklesOutline /></NIcon></template></NButton>
         <NButton size="tiny" quaternary @click="handleCopy" :disabled="!displayText" class="icon-btn" title="复制">
           <template #icon>
             <NIcon><CheckmarkCircleOutline v-if="copying" color="#18a058" /><CopyOutline v-else /></NIcon>
@@ -241,29 +234,20 @@ async function handleExport() {
 
       <!-- Content -->
       <div v-else class="result-scroll">
-        <!-- AI refine progress indicator -->
-        <div
-          v-if="refineProgress.total > 0 && refineProgress.done < refineProgress.total"
-          style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 6px 10px; background: #e8f5e9; border-radius: 6px;"
-        >
-          <NIcon size="16" color="#18a058"><SparklesOutline /></NIcon>
-          <NText style="font-size: 12px; color: #18a058">
-            AI 校对中... ({{ refineProgress.done }}/{{ refineProgress.total }})
-          </NText>
+                <!-- AI refine progress (animated dots) -->
+        <div v-if="refineProgress.total > 0 && refineProgress.done < refineProgress.total" class="refine-status">
+          <div class="refine-dots"><span class="rdot"></span><span class="rdot"></span><span class="rdot"></span></div>
+          <NText style="font-size:13px;color:#7c3aed;">AI ???...</NText>
+        </div>
+        <div v-else-if="refineFailed" style="padding:8px 14px;">
+          <NTag type="warning" size="small" :bordered="false">AI ???????????</NTag>
+        </div>
+        <div v-else-if="refineProgress.done >= refineProgress.total && !refineFailed" style="padding:6px 14px 0;">
+          <NTag type="success" size="tiny" :bordered="false"><template #icon><NIcon size="12"><SparklesOutline /></NIcon></template>AI ???</NTag>
         </div>
 
-        <!-- Refine failed warning -->
-        <div
-          v-if="refineFailed && refineProgress.done >= refineProgress.total"
-          style="margin-bottom: 10px;"
-        >
-          <NTag type="warning" size="small" :bordered="false">
-            部分校对失败，已回退为原始转写
-          </NTag>
-        </div>
-
-        <!-- Main text display -->
-        <div class="result-text">{{ displayText }}</div>
+<!-- Main text display -->
+        <div class="result-text">{{ formattedText }}</div>
 
         <!-- Segments (time-stamped) -->
         <template v-if="displaySegments.length > 0">
@@ -366,5 +350,26 @@ async function handleExport() {
   font-size: 12px;
   line-height: 1.7;
   color: #555;
+}
+
+/* AI refine dots */
+.refine-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.refine-dots { display: flex; gap: 6px; margin-bottom: 12px; }
+.rdot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #7c3aed;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+.rdot:nth-child(1) { animation-delay: -0.32s; }
+.rdot:nth-child(2) { animation-delay: -0.16s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
 }
 </style>

@@ -53,3 +53,7 @@ export async function downloadModelById(modelId: string, downloadUrl: string): P
 export async function refineAsrText(rawText: string, apiKey: string): Promise<string> {
   return invoke("refine_asr_text", { rawText, apiKey });
 }
+/** Check environment: ASR worker, models, FFmpeg, Python */
+export async function checkEnvironment(): Promise<import("./types").EnvCheck> {
+  return invoke("check_environment");
+}

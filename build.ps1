@@ -27,7 +27,7 @@ pyinstaller --onefile --noconsole --name asr_worker `
   --specpath build/pyinstaller `
   --clean `
   --hidden-import sherpa_onnx `
-  --hidden-import numpy `
+  --hidden-import numpy --hidden-import numpy.core.multiarray --hidden-import numpy.core._multiarray_umath --collect-all numpy `
   src-tauri\asr_worker.py
 
 if (-not (Test-Path src-tauri\binaries\asr_worker.exe)) {
