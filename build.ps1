@@ -21,7 +21,7 @@ pip install pyinstaller sherpa-onnx numpy --quiet
 Write-Host "`n=== Step 3/5: Building ASR sidecar (PyInstaller) ===" -ForegroundColor Cyan
 if (-not (Test-Path src-tauri\binaries)) { New-Item -ItemType Directory -Path src-tauri\binaries | Out-Null }
 
-pyinstaller --onefile --name asr_worker `
+pyinstaller --onefile --noconsole --name asr_worker `
   --distpath src-tauri/binaries `
   --workpath build/pyinstaller `
   --specpath build/pyinstaller `
