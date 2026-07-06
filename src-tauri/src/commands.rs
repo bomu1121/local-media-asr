@@ -64,3 +64,29 @@ pub fn get_resource_path(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| format!("Failed to get resource dir: {}", e))?;
     Ok(resource_dir.to_string_lossy().to_string())
 }
+
+#[tauri::command]
+pub fn run_asr(wav_path: String, models_dir: String, app: tauri::AppHandle) -> Result<String, String> {
+    use std::process::Command;
+    use std::os::windows::process::CommandExt;
+
+    let resource_dir = app.path().resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+    let asr_exe = resource_dir.join("asr_worker.exe");
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let output = Command::new(&asr_exe)
+        .args(["--wav", &wav_path, "--model", "paraformer", "--models-dir", &models_dir])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| format!("Failed to spawn ASR worker: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("ASR worker exited with code: {:?}\n{}", output.status.code(), stderr));
+    }
+
+    String::from_utf8(output.stdout)
+        .map_err(|e| format!("Invalid UTF-8 in ASR output: {}", e))
+}

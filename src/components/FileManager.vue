@@ -84,41 +84,40 @@ async function handleProcess(task: TaskFile) {
     }
 
     task.progress = 30;
-    // Step 2: ASR worker (Python in dev, sidecar exe in production)
+    // Step 2: ASR worker (python in dev, Rust command in prod)
     const resourceDir = await invoke("get_resource_path").catch(() => "");
     const useDev = !resourceDir;
 
-    let cmd: ReturnType<typeof Command.create>;
+    task.progress = 35; // show "running" while ASR works
+
+    let stdout: string;
+
     if (useDev) {
       // Dev: use python + asr_worker.py from src-tauri/
-      cmd = Command.create("python", [
+      const cmd = Command.create("python", [
         "src-tauri\asr_worker.py",
         "--wav", wavPath,
         "--model", "paraformer",
         "--models-dir", "src-tauri\models",
       ]);
+      const output = await cmd.execute();
+      if (output.code !== 0) {
+        const errMsg = output.stderr || "(no stderr)";
+        throw new Error("ASR worker exit code: " + output.code + "\n" + errMsg.substring(0, 500));
+      }
+      stdout = output.stdout;
     } else {
-      // Prod: use sidecar asr_worker.exe, models from resource dir
-      cmd = Command.sidecar("binaries/asr_worker", [
-        "--wav", wavPath,
-        "--model", "paraformer",
-        "--models-dir", resourceDir + "\models",
-      ]);
-    }
-
-    // Use execute() to collect all output at once
-    task.progress = 35; // show "running" while ASR works
-    const output = await cmd.execute();
-
-    if (output.code !== 0) {
-      const errMsg = output.stderr || "(no stderr)";
-      throw new Error("ASR worker exit code: " + output.code + "\n" + errMsg.substring(0, 500));
+      // Prod: use Rust command with CREATE_NO_WINDOW (no black box!)
+      stdout = await invoke("run_asr", {
+        wavPath: wavPath,
+        modelsDir: resourceDir + "\models",
+      });
     }
 
     // Parse JSON lines from stdout
     let resultText = "";
     let resultSegments: any[] = [];
-    const lines = (output.stdout || "").split("\n");
+    const lines = (stdout || "").split("\n");
     for (const line of lines) {
       if (!line.trim()) continue;
       try {

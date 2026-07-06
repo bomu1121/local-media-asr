@@ -105,6 +105,7 @@ pub fn run() {
             commands::check_models,
             commands::get_app_config,
             commands::get_resource_path,
+            commands::run_asr,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
