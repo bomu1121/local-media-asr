@@ -130,7 +130,7 @@ async function handleProcess(task: TaskFile) {
     }
 
     if (!resultText) {
-      throw new Error("ASR worker produced no output. stderr: " + (output.stderr || "(empty)").substring(0, 300));
+      throw new Error("ASR worker produced no output. The process completed but returned empty text.");
     }
 
     task.result = {
