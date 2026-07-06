@@ -3,7 +3,10 @@ use anyhow::{Context, Result};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::os::windows::process::CommandExt;
 use tauri::Emitter;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 /// Time regex: matches ffmpeg "time=HH:MM:SS.ms" progress output
 fn parse_time(line: &str) -> Option<f64> {
@@ -82,7 +85,7 @@ pub fn extract_audio_sync(
     .stdout(Stdio::piped())
     .stderr(Stdio::piped());
 
-    let mut child = cmd.spawn().context("Failed to start FFmpeg")?;
+    let mut child = cmd.creation_flags(CREATE_NO_WINDOW).spawn().context("Failed to start FFmpeg")?;
 
     let stderr = child
         .stderr
@@ -156,7 +159,7 @@ pub fn extract_audio_sync(
 
 /// Probe media file duration using ffprobe (quick, JSON-based)
 fn probe_duration(file_path: &str) -> Option<f64> {
-    let output = Command::new("ffprobe")
+    let output = Command::new("ffprobe").creation_flags(CREATE_NO_WINDOW)
         .args([
             "-v",
             "quiet",
@@ -205,7 +208,7 @@ pub fn get_media_info_sync(file_path: &str) -> Result<FileInfo> {
     };
 
     // Probe with ffprobe for detailed stream info
-    let output = Command::new("ffprobe")
+    let output = Command::new("ffprobe").creation_flags(CREATE_NO_WINDOW)
         .args([
             "-v",
             "quiet",
@@ -244,7 +247,7 @@ pub fn get_media_info_sync(file_path: &str) -> Result<FileInfo> {
 
 /// Check if FFmpeg is available and return version string
 pub fn check_ffmpeg_sync() -> Result<String> {
-    let output = Command::new("ffmpeg")
+    let output = Command::new("ffmpeg").creation_flags(CREATE_NO_WINDOW)
         .arg("-version")
         .output()
         .context("FFmpeg not found. Please install FFmpeg or use the sidecar bundle.")?;
