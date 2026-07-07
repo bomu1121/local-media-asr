@@ -1,7 +1,7 @@
 {
-  "productName": "local-media-asr",
+  "productName": "音视频转写助手",
   "version": "0.1.0",
-  "identifier": "com.localmedia.asr",
+  "identifier": "com.media.transcriber",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "本地媒体ASR - 离线音视频转文字",
+        "title": "音视频转写助手",
         "width": 1200,
         "height": 800,
         "minWidth": 900,

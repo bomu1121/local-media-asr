@@ -21,8 +21,8 @@ const tabs = [
   <div class="app-shell">
     <div class="top-bar">
       <div class="top-left">
-        <NText strong style="font-size:15px;color:#2080f0;">本地媒体ASR</NText>
-        <NText depth="3" style="font-size:12px;">离线运行 · 隐私安全</NText>
+        <NText strong style="font-size:15px;color:#2080f0;">音视频转写助手</NText>
+        <NText depth="3" style="font-size:12px;">本地运行 · 数据安全</NText>
       </div>
       <NText depth="3" style="font-size:12px;">
         {{ store.settings.engine === "fast" ? "快速引擎" : "精准引擎" }}

@@ -128,11 +128,30 @@ async function runRefine(raw: string) {
     const refined = await callDeepSeekAPI(raw, store.settings.aiApiKey);
     displayText.value = refined;
     refineProgress.value = { done: 1, total: 1 };
-    // Persist to store
+    // Persist refined text to store + history DB (irreversible)
     const task = activeTask.value;
     if (task?.result) {
       task.result.text = refined;
       task.result.refined = true;
+    }
+    // Overwrite history DB with refined text
+    if (task) {
+      try {
+        const { saveTranscription } = await import("../utils/invoke");
+        await saveTranscription({
+          task_id: task.id,
+          name: task.name,
+          file_path: task.path,
+          file_size: task.size,
+          file_format: task.format,
+          engine: task.result?.engine ?? "paraformer",
+          text: refined,
+          segments: (task.result?.segments ?? []).map((s: any) => ({ start: s.start, end: s.end, text: s.text })),
+          duration: task.result?.duration ?? 0,
+        });
+      } catch (e: any) {
+        console.error("Failed to update history with refined text:", e);
+      }
     }
   } catch (e: any) {
     console.error('Refine failed:', e);

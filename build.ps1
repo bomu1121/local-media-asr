@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# Build script for local-media-asr
+# Build script for 音视频转写助手
 # Produces NSIS installer at: src-tauri\target\release\bundle\nsis\
 
 $ErrorActionPreference = "Stop"

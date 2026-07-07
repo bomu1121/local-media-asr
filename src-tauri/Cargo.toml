@@ -1,5 +1,5 @@
 [package]
-name = "local-media-asr"
+name = "media-transcriber"
 version = "0.1.0"
 description = "Local AI-powered audio/video transcription tool"
 authors = ["you"]
