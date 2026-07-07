@@ -1,5 +1,5 @@
 {
-  "productName": "音视频转写助手",
+  "productName": "MediaTranscriber",
   "version": "0.1.0",
   "identifier": "com.media.transcriber",
   "build": {
@@ -39,7 +39,10 @@
     ],
     "windows": {
       "nsis": {
-        "languages": ["SimpChinese", "English"],
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
         "installMode": "currentUser"
       }
     },
