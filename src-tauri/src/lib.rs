@@ -107,6 +107,7 @@ pub fn run() {
             commands::get_resource_path,
             commands::run_asr,
             commands::check_environment,
+            commands::save_transcription,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

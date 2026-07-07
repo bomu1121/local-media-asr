@@ -25,6 +25,7 @@ export interface TranscriptionResult {
   }>;
   engine: EngineType;
   duration: number;
+  refined?: boolean;
 }
 
 export interface VadSettings {

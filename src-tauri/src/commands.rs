@@ -111,6 +111,44 @@ pub fn run_asr(wav_path: String, resource_dir: String) -> Result<String, String>
 }
 
 
+#[derive(Debug, serde::Deserialize)]
+pub struct SaveTranscriptionArgs {
+    pub task_id: String,
+    pub name: String,
+    pub file_path: String,
+    pub file_size: i64,
+    pub file_format: String,
+    pub engine: String,
+    pub text: String,
+    pub segments: Vec<SegmentArg>,
+    pub duration: f64,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct SegmentArg {
+    pub start: f64,
+    pub end: f64,
+    pub text: String,
+}
+
+#[tauri::command]
+pub async fn save_transcription(args: SaveTranscriptionArgs) -> Result<(), String> {
+    let trans_id = uuid::Uuid::new_v4().to_string();
+    tokio::task::spawn_blocking(move || {
+        crate::db::save_task(
+            &args.task_id, &args.name, &args.file_path,
+            args.file_size, &args.file_format, &args.engine,
+        ).map_err(|e| e.to_string())?;
+        let segments: Vec<crate::db::SegmentRecord> = args.segments.iter().map(|s| crate::db::SegmentRecord {
+            start_time: s.start, end_time: s.end, text: s.text.clone(),
+        }).collect();
+        crate::db::save_transcription(
+            &trans_id, &args.task_id, &args.engine,
+            &args.text, args.duration, &segments,
+        ).map_err(|e| e.to_string())
+    }).await.map_err(|e| format!("Join: {}", e))?
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct EnvCheck {
     pub ok: bool,

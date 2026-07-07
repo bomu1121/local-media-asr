@@ -120,9 +120,8 @@ async function callDeepSeekAPI(rawText: string, apiKey: string): Promise<string>
 
 // ---- AI refinement ----
 let hasAutoRefined = false;
-async function runRefine() {
-  const raw = displayText.value;
-  if (!raw || !store.settings.aiApiKey) return;
+async function runRefine(raw: string) {
+  if (!raw) return;
   refineProgress.value = { done: 0, total: 1 };
   refineFailed.value = false;
   try {
@@ -133,6 +132,7 @@ async function runRefine() {
     const task = activeTask.value;
     if (task?.result) {
       task.result.text = refined;
+      task.result.refined = true;
     }
   } catch (e: any) {
     console.error('Refine failed:', e);
@@ -156,14 +156,21 @@ watch(activeResult, (result) => {
 
   if (!result) return;
 
-  // If AI refine enabled: wait, don't show raw text
-  if (store.settings.enableAiRefine && store.settings.aiApiKey) {
-    // Don't set displayText yet - streamRefine will populate it as chunks complete
-    runRefine();
+  // Always populate segments for SRT/VTT/LRC format rendering
+  displaySegments.value = result.segments ?? [];
+
+  // Only auto-refine on transcribe tab; history tab is view-only
+  if (store.activeTab === "transcribe" && store.settings.enableAiRefine && store.settings.aiApiKey) {
+    if (result.refined) {
+      // Already refined: restore from store directly
+      displayText.value = result.text;
+    } else {
+      // First time: run AI refine
+      runRefine(result.text);
+    }
   } else {
-    // No AI: show raw text directly
+    // History tab or no AI: show raw text directly
     displayText.value = result.text;
-    displaySegments.value = result.segments ?? [];
   }
 }, { immediate: true });
 
@@ -211,7 +218,7 @@ async function handleExport() {
         {{ tab.label }}
       </button>
       <NSpace :size="4" class="tab-actions">
-        <NButton v-if="displayText && store.settings.aiApiKey && !(refineProgress.done >= refineProgress.total && !refineFailed)" size="tiny" quaternary @click="runRefine" class="icon-btn" title="AI ??"><template #icon><NIcon color="#7c3aed"><SparklesOutline /></NIcon></template></NButton>
+        <NButton v-if="displayText && store.settings.aiApiKey && !(refineProgress.done >= refineProgress.total && !refineFailed)" size="tiny" quaternary @click="runRefine(displayText)" class="icon-btn" title="AI 校对"><template #icon><NIcon color="#7c3aed"><SparklesOutline /></NIcon></template></NButton>
         <NButton size="tiny" quaternary @click="handleCopy" :disabled="!displayText" class="icon-btn" title="复制">
           <template #icon>
             <NIcon><CheckmarkCircleOutline v-if="copying" color="#18a058" /><CopyOutline v-else /></NIcon>
@@ -237,13 +244,13 @@ async function handleExport() {
                 <!-- AI refine progress (animated dots) -->
         <div v-if="refineProgress.total > 0 && refineProgress.done < refineProgress.total" class="refine-status">
           <div class="refine-dots"><span class="rdot"></span><span class="rdot"></span><span class="rdot"></span></div>
-          <NText style="font-size:13px;color:#7c3aed;">AI ???...</NText>
+          <NText style="font-size:13px;color:#7c3aed;">AI 校对中...</NText>
         </div>
         <div v-else-if="refineFailed" style="padding:8px 14px;">
-          <NTag type="warning" size="small" :bordered="false">AI ???????????</NTag>
+          <NTag type="warning" size="small" :bordered="false">AI 校对失败，显示原始转写</NTag>
         </div>
-        <div v-else-if="refineProgress.done >= refineProgress.total && !refineFailed" style="padding:6px 14px 0;">
-          <NTag type="success" size="tiny" :bordered="false"><template #icon><NIcon size="12"><SparklesOutline /></NIcon></template>AI ???</NTag>
+        <div v-else-if="refineProgress.done >= refineProgress.total && !refineFailed" style="padding:0 0 6px 0;">
+          <NTag type="success" size="tiny" :bordered="false"><template #icon><NIcon size="12"><SparklesOutline /></NIcon></template>AI 已校对</NTag>
         </div>
 
 <!-- Main text display -->

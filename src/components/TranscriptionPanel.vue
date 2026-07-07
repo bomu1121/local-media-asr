@@ -39,7 +39,7 @@ function selectHistoryItem(task: TaskRecord) {
   store.activeHistoryId = task.id;
   store.activeHistoryResult = task.result ? {
     text: task.result.full_text,
-    segments: [],
+    segments: (task.result.segments || []).map(s => ({ start: s.start_time, end: s.end_time, text: s.text })),
     engine: task.engine as any,
     duration: task.result.duration_secs,
   } : null;

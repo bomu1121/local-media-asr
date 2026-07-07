@@ -49,6 +49,20 @@ export async function downloadModelById(modelId: string, downloadUrl: string): P
   return invoke("download_model_by_id", { modelId, downloadUrl });
 }
 
+export async function saveTranscription(args: {
+  task_id: string;
+  name: string;
+  file_path: string;
+  file_size: number;
+  file_format: string;
+  engine: string;
+  text: string;
+  segments: Array<{ start: number; end: number; text: string }>;
+  duration: number;
+}): Promise<void> {
+  return invoke("save_transcription", { args });
+}
+
 /** AI text refinement via DeepSeek API */
 export async function refineAsrText(rawText: string, apiKey: string): Promise<string> {
   return invoke("refine_asr_text", { rawText, apiKey });

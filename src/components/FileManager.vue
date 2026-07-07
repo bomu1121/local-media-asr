@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { NButton, NSpace, NText, NIcon, NTag, NProgress, useMessage } from "naive-ui";
+import { NButton, NSpace, NText, NIcon, NTag, useMessage } from "naive-ui";
 import { CloudUploadOutline, PlayOutline, MusicalNotesOutline, FilmOutline, FolderOpenOutline } from "@vicons/ionicons5";
 import { useAppStore } from "../stores/app";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -36,6 +36,12 @@ function statusLabel(status: TaskFile["status"]): string {
 function statusColor(status: TaskFile["status"]): "default"|"info"|"success"|"error" {
   const c: Record<string,string> = { pending:"default", processing:"info", completed:"success", failed:"error" };
   return (c[status]||"default") as "default"|"info"|"success"|"error";
+}
+
+function stageLabel(progress: number): string {
+  if (progress < 30) return "提取音频";
+  if (progress < 100) return "ASR 转写中";
+  return "";
 }
 
 async function handleFileSelect() {
@@ -135,10 +141,29 @@ async function handleProcess(task: TaskFile) {
 
     task.result = {
       text: resultText, segments: resultSegments,
-      engine: "paraformer", duration: 0,
+      engine: "paraformer", duration: 0, refined: false,
     } as any;
     task.status = "completed";
     task.progress = 100;
+
+    // Persist to history DB
+    try {
+      const { saveTranscription } = await import("../utils/invoke");
+      await saveTranscription({
+        task_id: task.id,
+        name: task.name,
+        file_path: task.path,
+        file_size: task.size,
+        file_format: task.format,
+        engine: "paraformer",
+        text: resultText,
+        segments: resultSegments.map((s: any) => ({ start: s.start, end: s.end, text: s.text })),
+        duration: 0,
+      });
+    } catch (e: any) {
+      console.error("Failed to save to history:", e);
+    }
+
     message.success("处理完成");
   } catch (e: any) {
     task.status = "failed"; task.error = String(e);
@@ -196,8 +221,13 @@ onUnmounted(() => { unlistenExtract?.(); unlistenTranscribe?.(); });
           <NTag :type="statusColor(task.status)" size="tiny" :bordered="false">{{ statusLabel(task.status) }}</NTag>
         </NSpace>
       </div>
-      <NProgress v-if="task.status==='processing'" :percentage="task.progress"
-        :height="3" :border-radius="2" style="margin-top:4px;" />
+      <div v-if="task.status==='processing'" class="stage-bar">
+        <span class="stage-track">
+          <span class="stage-dot" :class="{ done: task.progress >= 30, active: task.progress < 30 }"></span>
+          <span class="stage-dot" :class="{ done: task.progress >= 100, active: task.progress >= 30 && task.progress < 100 }"></span>
+        </span>
+        <span class="stage-label">{{ stageLabel(task.progress) }}</span>
+      </div>
       <NText v-if="task.error" type="error" depth="3" style="font-size:11px;">{{ task.error.substring(0,80) }}</NText>
     </div>
     <div class="task-actions">
@@ -237,4 +267,41 @@ onUnmounted(() => { unlistenExtract?.(); unlistenTranscribe?.(); });
 .task-actions { flex-shrink:0;display:flex;align-items:center;gap:4px; }
 .action-btn:hover { transform:scale(1.05); }
 .empty-hint { text-align:center;padding:24px; }
+
+/* ---- stage loading indicator ---- */
+.stage-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-left: 2px;
+}
+.stage-track {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.stage-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d8d9db;
+  transition: background 0.3s;
+}
+.stage-dot.done {
+  background: #18a058;
+}
+.stage-dot.active {
+  background: #2080f0;
+  animation: stg-pulse 1.4s infinite ease-in-out;
+}
+.stage-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+@keyframes stg-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.65; }
+}
 </style>
