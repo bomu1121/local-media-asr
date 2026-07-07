@@ -30,11 +30,11 @@ function formatSize(bytes: number): string {
 
 function isAudio(format: string): boolean { return ["mp3","wav","flac","aac","ogg","wma","m4a","opus"].includes(format.toLowerCase()); }
 function statusLabel(status: TaskFile["status"]): string {
-  const l: Record<string,string> = { pending:"等待中", processing:"处理中", completed:"已完成", failed:"失败" };
+  const l: Record<string,string> = { pending:"开始提取", processing:"处理中", completed:"已完成", failed:"失败" };
   return l[status]||status;
 }
 function statusColor(status: TaskFile["status"]): "default"|"info"|"success"|"error" {
-  const c: Record<string,string> = { pending:"default", processing:"info", completed:"success", failed:"error" };
+  const c: Record<string,string> = { pending:"info", processing:"info", completed:"success", failed:"error" };
   return (c[status]||"default") as "default"|"info"|"success"|"error";
 }
 
@@ -210,39 +210,33 @@ onUnmounted(() => { unlistenExtract?.(); unlistenTranscribe?.(); });
       <div v-for="task in tasks" :key="task.id" class="task-row"
     :class="{ selected: store.activeTaskId===task.id }"
     @click="store.selectTask(task.id)">
-    <NIcon size="18" :color="task.status==='failed'?'#d03050':'#999'" class="task-icon">
-      <MusicalNotesOutline v-if="isAudio(task.format)" /><FilmOutline v-else />
-    </NIcon>
-    <div class="task-info">
-      <div class="task-top">
-        <NText class="task-name">{{ task.name }}</NText>
-        <NSpace :size="8" align="center" class="task-meta">
-          <NText depth="3" style="font-size:11px;">{{ task.format.toUpperCase() }} · {{ formatSize(task.size) }}</NText>
-          <NTag :type="statusColor(task.status)" size="tiny" :bordered="false">{{ statusLabel(task.status) }}</NTag>
-        </NSpace>
-      </div>
-      <div v-if="task.status==='processing'" class="stage-bar">
-        <span class="stage-track">
-          <span class="stage-dot" :class="{ done: task.progress >= 30, active: task.progress < 30 }"></span>
-          <span class="stage-dot" :class="{ done: task.progress >= 100, active: task.progress >= 30 && task.progress < 100 }"></span>
-        </span>
-        <span class="stage-label">{{ stageLabel(task.progress) }}</span>
-      </div>
-      <NText v-if="task.error" type="error" depth="3" style="font-size:11px;">{{ task.error.substring(0,80) }}</NText>
-    </div>
-    <div class="task-actions">
-      <NButton v-if="task.status==='pending'" size="tiny" type="primary"
-        @click.stop="handleProcess(task)" class="action-btn">
-        <template #icon><NIcon size="14"><PlayOutline /></NIcon></template>
-      </NButton>
-      <NButton v-if="task.status==='completed'" size="tiny" quaternary
-        @click.stop="openFolder(task.path)" class="action-btn">
-        <template #icon><NIcon size="14"><FolderOpenOutline /></NIcon></template>
-      </NButton>
-    </div>
-      </div>
+
+    <div class="task-row-main">
+      <NIcon size="16" :color="task.status==='failed'?'#d03050':'#999'" class="task-icon">
+        <MusicalNotesOutline v-if="isAudio(task.format)" /><FilmOutline v-else />
+      </NIcon>
+
+      <NText class="task-name" :class="{ 'name-clickable': task.status==='completed' }" @click.stop="task.status==='completed' && openFolder(task.path)">{{ task.name }}</NText>
+
+      <NText depth="3" class="task-meta">{{ task.format.toUpperCase() }} · {{ formatSize(task.size) }}</NText>
+
+      <div class="task-spacer"></div>
+
+<NTag v-if="task.status!=='processing'" :type="statusColor(task.status)" size="tiny" :bordered="false" :class="{ 'tag-btn': task.status==='pending' }" @click.stop="task.status==='pending' && handleProcess(task)">{{ statusLabel(task.status) }}</NTag>
+<div v-else class="stage-inline">
+  <span class="stage-track">
+    <span class="stage-dot" :class="{ done: task.progress >= 30, active: task.progress < 30 }"></span>
+    <span class="stage-dot" :class="{ done: task.progress >= 100, active: task.progress >= 30 && task.progress < 100 }"></span>
+  </span>
+  <span class="stage-label">{{ stageLabel(task.progress) }}</span>
+</div>
+
+
     </div>
 
+    <NText v-if="task.error" type="error" depth="3" style="font-size:11px;">{{ task.error.substring(0,80) }}</NText>
+      </div>
+    </div>
     <div v-if="tasks.length===0 && ffmpegReady!==false" class="empty-hint">
       <NText depth="3" style="font-size:13px;">选择文件后点击 ? 即可一键提取音频并转写</NText>
     </div>
@@ -256,41 +250,73 @@ onUnmounted(() => { unlistenExtract?.(); unlistenTranscribe?.(); });
 .drop-zone { display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;cursor:pointer;border:2px dashed #d0d0d0;border-radius:8px;background:#fafafa;transition: all 0.15s; }
 .drop-zone:hover { border-color:#2080f0;background:#f0f5ff; }
 .task-section { display:flex;flex-direction:column;gap:4px; }
-.task-row { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;cursor:pointer;background:var(--n-color);border:1px solid var(--n-border-color);transition: all 0.12s; }
-.task-row:hover { border-color:#2080f0; }
-.task-row.selected { border-color:#2080f0;background:rgba(32,128,240,0.04); }
-.task-icon { flex-shrink:0;align-self:center; }
-.task-info { flex:1;min-width:0;display:flex;flex-direction:column;gap:2px; }
-.task-top { display:flex;align-items:center;justify-content:space-between;gap:8px; }
-.task-name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px;font-size:13px; }
-.task-meta { flex-shrink:0; }
-.task-actions { flex-shrink:0;display:flex;align-items:center;gap:4px; }
-.action-btn:hover { transform:scale(1.05); }
-.empty-hint { text-align:center;padding:24px; }
 
-/* ---- stage loading indicator ---- */
-.stage-bar {
+.task-row {
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.task-row:hover { background: #F7F8FA; border-color: #e5e6eb; }
+.task-row.selected { border-color: #2080f0; background: rgba(32,128,240,0.04); }
+
+.task-row-main {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  padding-left: 2px;
+  height: 28px;
+}
+
+.task-icon { flex-shrink: 0; }
+
+.task-name {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #1D2129;
+}
+
+.task-meta {
+  flex-shrink: 0;
+  margin-left: 24px;
+  font-size: 12px;
+}
+
+.task-spacer { flex: 1; min-width: 8px; }
+.name-clickable { cursor: pointer; color: #1D2129; }
+.name-clickable:hover { color: #2080f0; }
+
+.action-btn { margin-left: 8px; }
+.tag-btn { cursor: pointer; }
+.tag-btn:hover { filter: brightness(0.9); }
+.action-btn:hover { transform: scale(1.05); }
+
+/* stage loading indicator (inline) */
+.stage-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .stage-track {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   flex-shrink: 0;
 }
 .stage-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   background: #d8d9db;
   transition: background 0.3s;
 }
-.stage-dot.done {
-  background: #18a058;
-}
+.stage-dot.done { background: #18a058; }
 .stage-dot.active {
   background: #2080f0;
   animation: stg-pulse 1.4s infinite ease-in-out;
@@ -299,9 +325,11 @@ onUnmounted(() => { unlistenExtract?.(); unlistenTranscribe?.(); });
   font-size: 12px;
   color: #666;
   font-weight: 500;
+  white-space: nowrap;
 }
 @keyframes stg-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.35); opacity: 0.65; }
 }
+.empty-hint { text-align:center;padding:24px; }
 </style>
