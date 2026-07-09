@@ -78,11 +78,13 @@ async function handleProcess(task: TaskFile) {
     const ext = task.path.split(".").pop()?.toLowerCase() ?? "";
     const isWav = ext === "wav";
     let wavPath = task.path;
+    let tempWav = false;
 
     if (!isWav) {
-      const parent = task.path.replace(/[\\/][^\\/]+$/, "");
+      const tempDir = await invoke<string>("get_temp_dir");
       const stem = task.path.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "output";
-      wavPath = parent + "\\" + stem + "_extracted.wav";
+      wavPath = tempDir + "\\asr_" + stem + "_" + crypto.randomUUID().slice(0, 8) + ".wav";
+      tempWav = true;
 
       await invoke("extract_audio", {
         args: { input_path: task.path, output_path: wavPath, denoise: false }

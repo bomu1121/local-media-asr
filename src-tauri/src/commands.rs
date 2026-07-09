@@ -295,3 +295,19 @@ pub fn check_environment(app: tauri::AppHandle) -> EnvCheck {
     let ok = items.iter().all(|i| i.passed);
     EnvCheck { ok, items }
 }
+
+/// Returns the system temp directory path
+#[tauri::command]
+pub fn get_temp_dir() -> String {
+    std::env::temp_dir().to_string_lossy().to_string()
+}
+
+/// Delete a temporary file (no error if file doesn't exist)
+#[tauri::command]
+pub fn delete_temp_file(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if p.exists() {
+        std::fs::remove_file(p).map_err(|e| format!("Failed to delete {}: {}", path, e))?;
+    }
+    Ok(())
+}

@@ -1,4 +1,4 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod commands;
@@ -108,6 +108,8 @@ pub fn run() {
             commands::run_asr,
             commands::check_environment,
             commands::save_transcription,
+            commands::get_temp_dir,
+            commands::delete_temp_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
